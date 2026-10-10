@@ -2,9 +2,9 @@
 
 EVI-ID is an early-stage Android application currently focused on command execution, diagnostics, logging, and basic project management.
 
-**Version:** `0.1.0-pre-alpha.1`
-**Development stage:** Pre-alpha
-**Platform:** Android
+- **Version:** `0.1.0-pre-alpha.1`
+- **Development stage:** Pre-alpha
+- **Platform:** Android
 
 The project is under active development. This repository documents the current implementation and its progress.
 
