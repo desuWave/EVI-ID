@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <AndroidSdkDirectory>/workspace/android-sdk</AndroidSdkDirectory>
+    <ZipAlignToolPath>/workspace/EVI-ID/.tools/android</ZipAlignToolPath>
+  </PropertyGroup>
+</Project>
+

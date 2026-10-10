@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <AssemblyName>EVI-ID</AssemblyName>
+    <RootNamespace>EVI_ID</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationId>com.x989.badapples.evi.id</ApplicationId>
+    <ApplicationTitle>EVI-ID</ApplicationTitle>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <AndroidSupportedAbis>arm64-v8a</AndroidSupportedAbis>
+    <CSharpShellApkUseDebugKey>True</CSharpShellApkUseDebugKey>
+    <CSharpShellApkCrashReports>True</CSharpShellApkCrashReports>
+    <CSharpShellApkSignatureSchemes>V2, V3</CSharpShellApkSignatureSchemes>
+    <CSharpShellApkDebuggable>False</CSharpShellApkDebuggable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="EVI-ID.cproj" />
+    <Compile Remove="EVI-ID.sln" />
+  </ItemGroup>
+</Project>
