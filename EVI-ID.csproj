@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.x989.badapples.evi.id</ApplicationId>
     <ApplicationTitle>EVI-ID</ApplicationTitle>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>0.1.0-pre-alpha.1</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <AndroidSupportedAbis>arm64-v8a</AndroidSupportedAbis>
     <CSharpShellApkUseDebugKey>True</CSharpShellApkUseDebugKey>
