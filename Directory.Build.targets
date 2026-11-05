@@ -1,7 +1,6 @@
 <Project>
   <PropertyGroup>
-    <AndroidSdkDirectory>/workspace/android-sdk</AndroidSdkDirectory>
-    <ZipAlignToolPath>/workspace/EVI-ID/.tools/android</ZipAlignToolPath>
+    <AndroidSdkDirectory>/workspace/.tools/android</AndroidSdkDirectory>
+    <AndroidSdkBuildToolsVersion>36.0.0</AndroidSdkBuildToolsVersion>
   </PropertyGroup>
 </Project>
-

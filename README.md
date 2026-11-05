@@ -1,62 +1,86 @@
-﻿# EVI-ID
+# EVI-ID
 
-EVI-ID is an early-stage Android application currently focused on command execution, diagnostics, logging, and basic project management.
+EVI-ID is an experimental Android application focused on command execution, file management, software development tools, and diagnostics.
 
-- **Version:** `0.1.0-pre-alpha.1`
-- **Development stage:** Pre-alpha
+- **Version:** `0.1.0`
+- **Development stage:** Pre-Alpha
 - **Platform:** Android
+- **Target framework:** .NET 10 (`net10.0-android`)
 
-The project is under active development. This repository documents the current implementation and its progress.
+## Overview
 
-## Current Features
+EVI-ID is an evolving Android-based development environment combining a command interface with project management, file-system operations, diagnostics, and experimental development modules.
 
-* Console interface for executing supported Android system commands.
-* Display of command exit codes, standard output, and errors.
-* Project directory creation and listing.
-* Diagnostics activity.
-* Application logging and log copying.
-* Separate Console, GUI, and Projects tabs.
+The project is under active development. Features, interfaces, and internal architecture may change.
 
-Available commands depend on the Android application environment and system permissions. EVI-ID does not provide unrestricted access to the Android operating system or imply root access.
+## Current Implementation
 
-## Current Limitations
+### Console and Commands
 
-* The GUI tab does not yet provide a complete graphical workspace.
-* A complete workflow for creating, building, and running C# projects inside the application is not implemented.
-* The application is an early prototype and is not a feature-complete development environment.
+- Interactive command interface.
+- Built-in file and directory operations.
+- Command output and error reporting.
+- Command help system.
+- Internal working-directory navigation.
+
+### File System and Projects
+
+- Internal project directory management.
+- External folder access through Android's Storage Access Framework (SAF).
+- File creation, reading, writing, renaming, and deletion.
+- Internal and external directory navigation.
+
+### Diagnostics and Logging
+
+- Dedicated diagnostics activity.
+- Application logging.
+- Log viewing and copying.
+- Startup diagnostics.
+- Operation tracking.
+
+### Experimental Development Modules
+
+The source tree includes modules for:
+
+- C# compilation and build operations.
+- Editor buffers and editing sessions.
+- Runtime type loading and method invocation.
+- Git integration.
+- Source-code structure and refactoring analysis.
+- Build-output navigation.
+- Internal unit testing.
+
+These components are under development and should not be considered production-ready.
 
 ## Project Structure
 
-* `MainActivity.cs` — main application interface.
-* `DiagnosticsActivity.cs` — diagnostics interface.
-* `Shell/` — command execution, logging, and storage infrastructure.
-* `EVI-ID.csproj` — project configuration and application version.
-* `EVI-ID.sln` and `EVI-ID.slnx` — solution files.
-
-## Versioning
-
-EVI-ID currently uses pre-release version numbering.
-
-Current application display version:
-
-`0.1.0-pre-alpha.1`
-
-This version identifies an early development milestone and does not indicate production readiness.
+| Path | Purpose |
+|---|---|
+| `MainActivity.cs` | Main Android application interface and command handling |
+| `DiagnosticsActivity.cs` | Diagnostics interface |
+| `Shell/` | Command execution, file systems, storage, logging and shell services |
+| `mdl/Build/` | Build functionality |
+| `mdl/Editor/` | Experimental editor and compilation functionality |
+| `mdl/Git/` | Git-related functionality |
+| `mdl/RefactorEngine.cs` | Source-code analysis |
+| `Testing/` | Internal testing utilities |
 
 ## Build Requirements
 
-Building EVI-ID requires a compatible .NET SDK and the Android workload.
+EVI-ID targets .NET 10 for Android.
 
-See `EVI-ID.csproj` for the target framework, application identifier, version, and other build settings.
+Building requires a compatible .NET SDK, Android development tooling, and the appropriate Android workload or supported build environment.
 
-## Build Artifacts
+Some development configurations may require locally supplied reference assemblies and SDK paths.
 
-APK files generated during development are build artifacts. They may be retained locally or archived separately by version.
+## Development Status
 
-Build output directories such as `bin/` and `obj/` are excluded from Git.
+**Pre-Alpha — active development.**
 
-## Project Status
+The current implementation is experimental. Not all features have been fully tested, and some functionality may be incomplete or platform-dependent.
 
-**Pre-alpha — active development.**
+## Future Development
 
-Features and internal structure may change as development progresses.
+Development may include improvements to the editor, build tools, project management, Git integration, diagnostics, and the overall interactive development experience.
+
+No stable release is currently declared.

@@ -11,22 +11,56 @@ public sealed class CommandResult
 
     public string StandardOutput { get; init; } = "";
 
-    public string StandardError { get; init; }
-
-    = "";
+    public string StandardError { get; init; } = "";
 }
 
 public static class CommandRunner
 {
-    public static async Task<CommandResult> RunAsync(
+    private static readonly TimeSpan CommandTimeout =
+        TimeSpan.FromSeconds(30);
+
+    private const int ErrorExitCode = -1;
+    private const int TimeoutExitCode = -2;
+
+    public static Task<CommandResult> RunAsync(
         string executable,
         params string[] arguments)
     {
-        Logger.Info($"Command started: {executable}");
+        return RunAsync(
+            executable,
+            null,
+            arguments);
+    }
+
+    public static async Task<CommandResult> RunAsync(
+        string executable,
+        string? workingDirectory,
+        params string[] arguments)
+    {
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            const string message =
+                "Executable name is empty.";
+
+            Logger.Warning(message);
+
+            return new CommandResult
+            {
+                ExitCode = ErrorExitCode,
+                StandardError = message
+            };
+        }
+
+        Logger.Info(
+            $"Command started: {executable}");
 
         try
         {
-            if (!File.Exists(executable))
+            bool executableIsPath =
+                Path.IsPathRooted(executable);
+
+            if (executableIsPath &&
+                !File.Exists(executable))
             {
                 string message =
                     $"Command not found: {executable}";
@@ -35,7 +69,23 @@ public static class CommandRunner
 
                 return new CommandResult
                 {
-                    ExitCode = -1,
+                    ExitCode = ErrorExitCode,
+                    StandardError = message
+                };
+            }
+
+            if (!string.IsNullOrWhiteSpace(workingDirectory) &&
+                !Directory.Exists(workingDirectory))
+            {
+                string message =
+                    $"Working directory not found: " +
+                    $"{workingDirectory}";
+
+                Logger.Warning(message);
+
+                return new CommandResult
+                {
+                    ExitCode = ErrorExitCode,
                     StandardError = message
                 };
             }
@@ -48,6 +98,12 @@ public static class CommandRunner
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
+
+            if (!string.IsNullOrWhiteSpace(workingDirectory))
+            {
+                startInfo.WorkingDirectory =
+                    workingDirectory;
+            }
 
             foreach (string argument in arguments)
             {
@@ -68,7 +124,7 @@ public static class CommandRunner
 
                 return new CommandResult
                 {
-                    ExitCode = -1,
+                    ExitCode = ErrorExitCode,
                     StandardError = message
                 };
             }
@@ -79,14 +135,71 @@ public static class CommandRunner
             Task<string> stderrTask =
                 process.StandardError.ReadToEndAsync();
 
+            Task exitTask =
+                process.WaitForExitAsync();
+
+            Task timeoutTask =
+                Task.Delay(CommandTimeout);
+
+            Task completedTask =
+                await Task.WhenAny(
+                    exitTask,
+                    timeoutTask);
+
+            bool timedOut =
+                completedTask != exitTask;
+
+            if (timedOut)
+            {
+                string timeoutMessage =
+                    $"Command timed out after " +
+                    $"{CommandTimeout.TotalSeconds:0} seconds.";
+
+                Logger.Warning(timeoutMessage);
+
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill();
+                }
+                catch (Exception killException)
+                {
+                    Logger.Error(
+                        "Failed to terminate timed-out command: " +
+                        $"{killException.GetType().Name}: " +
+                        $"{killException.Message}");
+                }
+            }
+
             await process.WaitForExitAsync();
 
-            string stdout = await stdoutTask;
-            string stderr = await stderrTask;
+            string stdout =
+                await stdoutTask;
+
+            string stderr =
+                await stderrTask;
+
+            if (timedOut)
+            {
+                string timeoutMessage =
+                    $"Command timed out after " +
+                    $"{CommandTimeout.TotalSeconds:0} seconds.";
+
+                stderr =
+                    string.IsNullOrWhiteSpace(stderr)
+                        ? timeoutMessage
+                        : stderr.TrimEnd() +
+                          Environment.NewLine +
+                          timeoutMessage;
+            }
 
             var result = new CommandResult
             {
-                ExitCode = process.ExitCode,
+                ExitCode =
+                    timedOut
+                        ? TimeoutExitCode
+                        : process.ExitCode,
+
                 StandardOutput = stdout,
                 StandardError = stderr
             };
@@ -118,7 +231,7 @@ public static class CommandRunner
 
             return new CommandResult
             {
-                ExitCode = -1,
+                ExitCode = ErrorExitCode,
                 StandardError = message
             };
         }

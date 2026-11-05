@@ -23,3 +23,16 @@ Thumbs.db
 
 # Local Android tooling
 .tools/
+
+# Local reference assemblies and packages
+/EVI-ID-References/
+/netcore-ref/
+/netcore-ref.nupkg
+
+# Local source backups
+*.version-backup
+*.broken-backup
+*.csproj.version-backup
+
+# Local Git configuration backups
+.gitignore.backup
