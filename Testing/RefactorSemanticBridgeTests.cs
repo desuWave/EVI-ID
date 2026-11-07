@@ -29,7 +29,7 @@ public static partial class UnitTestRunner
 
                 AssertTrue(
                     report.Contains(
-                        "SemanticSafety: ReviewRequired"),
+                        "SemanticSafety: Unsupported"),
                     "Expected semantic review result.");
 
                 AssertTrue(
@@ -134,7 +134,7 @@ public static partial class UnitTestRunner
                         group);
 
                 AssertEqual(
-                    RefactorSafetyStatus.ReviewRequired,
+                    RefactorSafetyStatus.Unsupported,
                     result.Status);
             });
 
@@ -184,6 +184,64 @@ public static partial class UnitTestRunner
     private static void RunBridgeDiagnosticsTests(
         List<UnitTestResult> results)
     {
+        Run(results,
+            "RefactorBridge: syntax errors unsupported",
+            () =>
+            {
+                string source = MakeBridgeTestSource()
+                    .Replace("int value0 = 0;",
+                             "int value0 = ;");
+                var tree = CSharpSyntaxTree.ParseText(source);
+                var method = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+                var statements = method.Body!.Statements;
+                var group = new RefactorGroup(
+                    1, 100, statements.Count, 100,
+                    "CandidateForExtraction", "Candidate",
+                    "None", "None", false, "None");
+                group.SetSourceSpan(
+                    statements[0].SpanStart,
+                    statements[^1].Span.End);
+                var result = RefactorSemanticBridge.Evaluate(
+                    tree, method, group);
+                AssertEqual(RefactorSafetyStatus.Unsupported,
+                    result.Status);
+                AssertTrue(result.Reasons.Contains(
+                    "SyntaxErrorsPresent"),
+                    "Missing syntax error reason.");
+            });
+
+        Run(results,
+            "RefactorBridge: unresolved type unsupported",
+            () =>
+            {
+                string source = MakeBridgeTestSource()
+                    .Replace("int value0 = 0;",
+                             "MissingType value0 = null;");
+                var tree = CSharpSyntaxTree.ParseText(source);
+                var method = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+                var statements = method.Body!.Statements;
+                var group = new RefactorGroup(
+                    1, 100, statements.Count, 100,
+                    "CandidateForExtraction", "Candidate",
+                    "None", "None", false, "None");
+                group.SetSourceSpan(
+                    statements[0].SpanStart,
+                    statements[^1].Span.End);
+                var result = RefactorSemanticBridge.Evaluate(
+                    tree, method, group);
+                AssertEqual(RefactorSafetyStatus.Unsupported,
+                    result.Status);
+                AssertTrue(result.Reasons.Contains(
+                    "UnresolvedSymbolsOrReferences"),
+                    "Missing unresolved type reason.");
+            });
+
         Run(results,
             "RefactorBridge: syntax error classification",
             () =>
@@ -245,7 +303,7 @@ public static partial class UnitTestRunner
                         maxMethodLines: 1);
 
                 AssertTrue(report.Contains(
-                    "SemanticSafety: ReviewRequired"),
+                    "SemanticSafety: Unsupported"),
                     "Safety status was lost.");
                 AssertTrue(report.Contains(
                     "CompilationDiagnosticsPresent"),

@@ -130,10 +130,7 @@ public static class RefactorSemanticBridge
                 .ToArray();
 
             return new RefactorSafetyResult(
-                result.Status ==
-                    RefactorSafetyStatus.Unsupported
-                    ? RefactorSafetyStatus.Unsupported
-                    : RefactorSafetyStatus.ReviewRequired,
+                RefactorSafetyStatus.Unsupported,
                 reasons);
         }
         catch (Exception)
