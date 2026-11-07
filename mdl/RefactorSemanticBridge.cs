@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -11,7 +12,8 @@ public static class RefactorSemanticBridge
     public static RefactorSafetyResult Evaluate(
         SyntaxTree tree,
         MethodDeclarationSyntax method,
-        RefactorGroup group)
+        RefactorGroup group,
+        IEnumerable<MetadataReference>? references = null)
     {
         if (tree == null ||
             method?.Body == null ||
@@ -81,7 +83,8 @@ public static class RefactorSemanticBridge
         {
             var compilation = CSharpCompilation.Create(
                 "EVIRefactorSemanticAnalysis",
-                new[] { tree });
+                new[] { tree },
+                references: references);
 
             var model =
                 compilation.GetSemanticModel(tree);

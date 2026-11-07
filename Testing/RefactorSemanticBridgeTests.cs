@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,6 +15,42 @@ public static partial class UnitTestRunner
         List<UnitTestResult> results)
     {
         RunBridgeDiagnosticsTests(results);
+        Run(results,
+            "RefactorBridge: explicit references",
+            () =>
+            {
+                string source =
+                    "class C { void M() { int x = 1; x++; } }";
+                var tree = CSharpSyntaxTree.ParseText(source);
+                var method = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+                var statements = method.Body!.Statements;
+                var group = new RefactorGroup(
+                    1, 1, statements.Count, 1,
+                    "CandidateForExtraction", "Candidate",
+                    "None", "None", false, "None");
+                group.SetSourceSpan(
+                    statements[0].SpanStart,
+                    statements[^1].Span.End);
+
+                var implicitResult =
+                    RefactorSemanticBridge.Evaluate(
+                        tree, method, group);
+                var explicitResult =
+                    RefactorSemanticBridge.Evaluate(
+                        tree, method, group,
+                        Array.Empty<MetadataReference>());
+
+                AssertEqual(implicitResult.Status,
+                    explicitResult.Status);
+                AssertEqual(RefactorSafetyStatus.Unsupported,
+                    explicitResult.Status);
+                AssertTrue(explicitResult.Reasons.Contains(
+                    "CompilationDiagnosticsPresent"),
+                    "Missing compilation diagnostics.");
+            });
         Run(
             results,
             "RefactorBridge: matching statements",
