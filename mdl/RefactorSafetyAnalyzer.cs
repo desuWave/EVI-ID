@@ -121,6 +121,33 @@ public static class RefactorSafetyAnalyzer
             reasons.Add("NestedOrAsyncExecution");
         }
 
+        ControlFlowAnalysis? controlFlow;
+
+        try
+        {
+            controlFlow = semanticModel.AnalyzeControlFlow(
+                ordered[0], ordered[^1]);
+        }
+        catch (ArgumentException)
+        {
+            return new RefactorSafetyResult(
+                RefactorSafetyStatus.Unsupported,
+                new[] { "ControlFlowUnavailable" });
+        }
+
+        if (controlFlow == null || !controlFlow.Succeeded)
+        {
+            return new RefactorSafetyResult(
+                RefactorSafetyStatus.Unsupported,
+                new[] { "ControlFlowUnavailable" });
+        }
+
+        if (controlFlow.EntryPoints.Any())
+            reasons.Add("ControlFlowEntryPoints");
+
+        if (controlFlow.ExitPoints.Any())
+            reasons.Add("ControlFlowExitPoints");
+
         DataFlowAnalysis? flow;
 
         try

@@ -14,6 +14,34 @@ public static partial class UnitTestRunner
         List<UnitTestResult> results)
     {
         Run(results,
+            "RefactorSafety: control flow exit",
+            () =>
+            {
+                var result = AnalyzeSafety(
+                    "class C { int M() { " +
+                    "int x = 1; return x; } }",
+                    0, 2);
+                AssertTrue(result.Reasons.Contains(
+                    "ControlFlowExitPoints"),
+                    "Exit point was not detected.");
+            });
+
+        Run(results,
+            "RefactorSafety: control flow normal",
+            () =>
+            {
+                var result = AnalyzeSafety(
+                    "class C { void M() { " +
+                    "int x = 1; x++; } }",
+                    0, 2);
+                AssertTrue(result.Status ==
+                    RefactorSafetyStatus.ReviewRequired,
+                    "Unexpected control flow status.");
+                AssertTrue(!result.Reasons.Contains(
+                    "ControlFlowUnavailable"),
+                    "Control flow analysis failed.");
+            });
+        Run(results,
             "RefactorSafety: semantic tree mismatch",
             () =>
             {
