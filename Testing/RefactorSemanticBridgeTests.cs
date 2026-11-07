@@ -173,6 +173,19 @@ public static partial class UnitTestRunner
                 AssertTrue(explicitResult.Reasons.Contains(
                     "CompilationDiagnosticsPresent"),
                     "Missing compilation diagnostics.");
+
+                var diagnosticCodes = explicitResult.Reasons
+                    .Where(r => r.StartsWith("Diagnostic:"))
+                    .OrderBy(r => r)
+                    .ToArray();
+
+                AssertTrue(diagnosticCodes.Length > 0,
+                    "Missing Roslyn diagnostic IDs.");
+
+                AssertTrue(diagnosticCodes.Contains(
+                    "Diagnostic:CS0518"),
+                    "Observed diagnostics: " +
+                    string.Join(", ", diagnosticCodes));
             });
         Run(
             results,
