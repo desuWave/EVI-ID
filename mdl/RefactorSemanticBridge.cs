@@ -129,6 +129,10 @@ public static class RefactorSemanticBridge
                 .Concat(unresolvedSymbols
                     ? new[] { "UnresolvedSymbolsOrReferences" }
                     : Array.Empty<string>())
+                .Concat(compilation.GetDiagnostics()
+                    .Where(d =>
+                        d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => "Diagnostic:" + d.Id))
                 .Distinct()
                 .ToArray();
 

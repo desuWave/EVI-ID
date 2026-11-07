@@ -76,6 +76,24 @@ public static partial class UnitTestRunner
                     resolvedSymbol!.Name);
                 AssertEqual("ExternalLibrary",
                     resolvedSymbol.ContainingAssembly.Name);
+
+                var missingTypeErrors = withoutReference
+                    .GetDiagnostics()
+                    .Where(d => d.Id == "CS0246")
+                    .ToArray();
+
+                var resolvedTypeErrors = withReference
+                    .GetDiagnostics()
+                    .Where(d => d.Id == "CS0246")
+                    .ToArray();
+
+                AssertTrue(missingTypeErrors.Any(d =>
+                    d.GetMessage().Contains("ExternalWidget")),
+                    "Missing expected CS0246 for ExternalWidget.");
+
+                AssertTrue(!resolvedTypeErrors.Any(d =>
+                    d.GetMessage().Contains("ExternalWidget")),
+                    "ExternalWidget remains unresolved.");
             });
         Run(results,
             "RefactorBridge: compilation reference through bridge",
@@ -383,6 +401,9 @@ public static partial class UnitTestRunner
                 AssertTrue(result.Reasons.Contains(
                     "UnresolvedSymbolsOrReferences"),
                     "Missing unresolved type reason.");
+                AssertTrue(result.Reasons.Contains(
+                    "Diagnostic:CS0246"),
+                    "Missing CS0246 diagnostic reason.");
             });
 
         Run(results,
