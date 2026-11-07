@@ -548,6 +548,15 @@ output.AppendLine(
 
 foreach (RefactorGroup group in groups)  
 {  
+    var semanticResult =
+        RefactorSemanticBridge.Evaluate(
+            tree, method, group);
+
+    output.AppendLine(
+        $"          SemanticSafety: {semanticResult.Status}");
+
+    output.AppendLine(
+        $"          SemanticReasons: {string.Join(",", semanticResult.Reasons)}");
     output.AppendLine(  
         $"        Lines: " +  
         $"{group.StartLine}-{group.EndLine}");  
