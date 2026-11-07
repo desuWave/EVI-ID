@@ -52,6 +52,16 @@ public static class RefactorSafetyAnalyzer
                 new[] { "NullStatement" });
         }
 
+        if (statements.Any(s =>
+            !ReferenceEquals(
+                s.SyntaxTree,
+                semanticModel.SyntaxTree)))
+        {
+            return new RefactorSafetyResult(
+                RefactorSafetyStatus.Unsupported,
+                new[] { "SemanticTreeMismatch" });
+        }
+
         if (statements.Any(s => s.Parent is not BlockSyntax) ||
             statements.Select(s => s.Parent).Distinct().Count() != 1)
         {

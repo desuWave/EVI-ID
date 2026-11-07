@@ -13,6 +13,31 @@ public static partial class UnitTestRunner
     private static void RunRefactorSafetyAnalyzerTests(
         List<UnitTestResult> results)
     {
+        Run(results,
+            "RefactorSafety: semantic tree mismatch",
+            () =>
+            {
+                var firstTree = CSharpSyntaxTree.ParseText(
+                    "class A { void M() { int x = 1; } }");
+                var secondTree = CSharpSyntaxTree.ParseText(
+                    "class B { void M() { int y = 2; } }");
+                var compilation = CSharpCompilation.Create(
+                    "TreeMismatchTest",
+                    new[] { firstTree, secondTree });
+                var model = compilation.GetSemanticModel(firstTree);
+                var method = secondTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+                var result = RefactorSafetyAnalyzer.Analyze(
+                    model, method.Body!.Statements.ToArray());
+                AssertEqual(
+                    RefactorSafetyStatus.Unsupported,
+                    result.Status);
+                AssertTrue(result.Reasons.Contains(
+                    "SemanticTreeMismatch"),
+                    "Tree mismatch was not detected.");
+            });
         Run(
             results,
             "RefactorSafety: independent statements",
