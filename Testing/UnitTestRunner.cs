@@ -24,7 +24,7 @@ public sealed class UnitTestResult
     }
 }
 
-public static class UnitTestRunner
+public static partial class UnitTestRunner
 {
     private sealed class TestContext
     {
@@ -45,6 +45,7 @@ public static class UnitTestRunner
     }
 
     public static string RunAll(
+        Android.Content.Context androidContext,
         bool verbose = false)
     {
         var results =
@@ -430,6 +431,18 @@ public static class UnitTestRunner
                         "Project still exists after removal.");
                 });
 
+            RunEVIFileSystemTests(
+                results,
+                androidContext,
+                testRoot);
+
+            RunEVIFileSystemSourceTests(
+                results,
+                androidContext,
+                testRoot);
+
+            RunRefactorEngineTests(results);
+
             return FormatResults(
                 results,
                 verbose);
@@ -533,21 +546,25 @@ public static class UnitTestRunner
 
         output.AppendLine();
 
+        int testNumber = 0;
+
         foreach (UnitTestResult result in results)
         {
+            testNumber++;
+
             if (result.Passed)
             {
                 passed++;
 
                 output.AppendLine(
-                    $"[PASS] {result.Name}");
+                    $"[{testNumber:D3}] [PASS] {result.Name}");
             }
             else
             {
                 failed++;
 
                 output.AppendLine(
-                    $"[FAIL] {result.Name}");
+                    $"[{testNumber:D3}] [FAIL] {result.Name}");
 
                 if (!string.IsNullOrWhiteSpace(
                         result.Message))

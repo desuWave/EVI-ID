@@ -5,9 +5,6 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <AssemblyName>EVI-ID</AssemblyName>
     <RootNamespace>EVI_ID</RootNamespace>
-    <PackageReference
-  Include="Microsoft.CodeAnalysis.CSharp"
-  Version="5.9.0" />
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.x989.badapples.evi.id</ApplicationId>
@@ -21,6 +18,10 @@
     <CSharpShellApkDebuggable>False</CSharpShellApkDebuggable>
   </PropertyGroup>
   <ItemGroup>
+  <PackageReference
+  Include="Microsoft.CodeAnalysis.CSharp"
+  Version="5.9.0" />
+  
     <Compile Remove="EVI-ID.cproj" />
     <Compile Remove="EVI-ID.sln" />
   </ItemGroup>

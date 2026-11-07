@@ -1322,7 +1322,7 @@ case "page":
                         case "utst":
             case "unit_test":
                 AppendConsole(
-                    UnitTestRunner.RunAll() + "\n");
+                    UnitTestRunner.RunAll(this) + "\n");
 
                 return true;
 
@@ -2056,33 +2056,55 @@ private void ExecuteRefactorCommand(
     {
         AppendConsole(
             "Usage: refactor <file-or-directory>\n");
-
         return;
     }
 
     try
     {
-        string path =
-            arguments[0];
+        if (_fileSystem is null)
+        {
+            throw new InvalidOperationException(
+                "EVI file system is not initialized.");
+        }
 
-        RefactorEngine engine =
-            new();
+        string path = arguments[0];
 
-        int exitCode =
-            engine.Analyze(
+        if (_fileSystem.Space == EVIFileSpace.Internal)
+        {
+            string fullPath =
+                ResolveInternalConsolePath(path);
+
+            path = System.IO.Path.GetRelativePath(
+                StorageManager.RootDirectory,
+                fullPath);
+        }
+
+        var sources =
+            _fileSystem.ReadCSharpSources(
                 path,
+                out bool isDirectory);
+
+        RefactorEngine engine = new();
+
+        string report =
+            engine.AnalyzeSources(
+                path,
+                sources,
+                isDirectory,
                 500,
                 200,
                 10);
 
-        AppendConsole(
-            $"Refactor exit code: {exitCode}\n");
+        AppendConsole(report);
+        AppendConsole("Refactor exit code: 0\n");
     }
     catch (Exception ex)
     {
+        Logger.Error(
+            $"Refactor command failed: {ex}");
         AppendConsole(
-            $"{ex.GetType().Name}: " +
-            $"{ex.Message}\n");
+            $"{ex.GetType().Name}: {ex.Message}\n");
+        AppendConsole("Refactor exit code: 1\n");
     }
 }
 

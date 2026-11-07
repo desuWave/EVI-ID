@@ -199,6 +199,57 @@ public sealed class RefactorEngine
         return 1;
     }
 
+    public string AnalyzeSources(
+        string sourcePath,
+        IReadOnlyList<(string Name, string Content)> sources,
+        bool isDirectory,
+        int maxFileLines = DefaultMaxFileLines,
+        int maxMethodLines = DefaultMaxMethodLines,
+        int maxDepth = DefaultMaxDepth)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+
+        if (!isDirectory)
+        {
+            if (sources.Count == 0)
+            {
+                return $"Skipping non-C# file: {sourcePath}"
+                    + Environment.NewLine;
+            }
+
+            var source = sources[0];
+
+            return AnalyzeSource(
+                source.Name,
+                source.Content,
+                maxFileLines,
+                maxMethodLines,
+                maxDepth);
+        }
+
+        StringBuilder output = new();
+
+        output.AppendLine("EVI-Refactor Analysis");
+        output.AppendLine();
+        output.AppendLine($"Root: {sourcePath}");
+        output.AppendLine($"C# files: {sources.Count}");
+        output.AppendLine();
+
+        foreach (var source in sources.OrderBy(
+            x => x.Name,
+            StringComparer.OrdinalIgnoreCase))
+        {
+            output.Append(AnalyzeSource(
+                source.Name,
+                source.Content,
+                maxFileLines,
+                maxMethodLines,
+                maxDepth));
+        }
+
+        return output.ToString();
+    }
+
     public string AnalyzeSource(
         string sourceName,
         string source,
