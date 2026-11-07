@@ -16,6 +16,111 @@ public static partial class UnitTestRunner
     {
         RunBridgeDiagnosticsTests(results);
         Run(results,
+            "RefactorBridge: compilation reference",
+            () =>
+            {
+                var externalTree =
+                    CSharpSyntaxTree.ParseText(
+                        "public class ExternalWidget {} ");
+                var externalCompilation =
+                    CSharpCompilation.Create(
+                        "ExternalLibrary",
+                        new[] { externalTree },
+                        options: new CSharpCompilationOptions(
+                            OutputKind.DynamicallyLinkedLibrary));
+
+                var sourceTree =
+                    CSharpSyntaxTree.ParseText(
+                        "class C { ExternalWidget field; }");
+
+                var withoutReference =
+                    CSharpCompilation.Create(
+                        "WithoutReference",
+                        new[] { sourceTree });
+                var withReference =
+                    CSharpCompilation.Create(
+                        "WithReference",
+                        new[] { sourceTree },
+                        references: new MetadataReference[]
+                        {
+                            externalCompilation.ToMetadataReference()
+                        });
+
+                AssertTrue(
+                    withoutReference.GetTypeByMetadataName(
+                        "ExternalWidget") == null,
+                    "External type unexpectedly available.");
+                AssertTrue(
+                    withReference.GetTypeByMetadataName(
+                        "ExternalWidget") != null,
+                    "External type not resolved.");
+
+                var typeSyntax = sourceTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<VariableDeclarationSyntax>()
+                    .Single().Type;
+
+                var missingSymbol = withoutReference
+                    .GetSemanticModel(sourceTree)
+                    .GetSymbolInfo(typeSyntax).Symbol;
+
+                var resolvedSymbol = withReference
+                    .GetSemanticModel(sourceTree)
+                    .GetSymbolInfo(typeSyntax).Symbol;
+
+                AssertTrue(missingSymbol == null,
+                    "External type resolved without reference.");
+                AssertTrue(resolvedSymbol != null,
+                    "External type usage was not bound.");
+                AssertEqual("ExternalWidget",
+                    resolvedSymbol!.Name);
+                AssertEqual("ExternalLibrary",
+                    resolvedSymbol.ContainingAssembly.Name);
+            });
+        Run(results,
+            "RefactorBridge: compilation reference through bridge",
+            () =>
+            {
+                var externalTree = CSharpSyntaxTree.ParseText(
+                    "public class ExternalWidget {}");
+                var externalCompilation = CSharpCompilation.Create(
+                    "ExternalLibrary",
+                    new[] { externalTree },
+                    options: new CSharpCompilationOptions(
+                        OutputKind.DynamicallyLinkedLibrary));
+
+                var tree = CSharpSyntaxTree.ParseText(
+                    "class C { void M() { ExternalWidget x = null; } }");
+                var method = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+                var statements = method.Body!.Statements;
+                var group = new RefactorGroup(
+                    1, 1, statements.Count, 1,
+                    "CandidateForExtraction", "Candidate",
+                    "None", "None", false, "None");
+                group.SetSourceSpan(
+                    statements[0].SpanStart,
+                    statements[^1].Span.End);
+
+                var result = RefactorSemanticBridge.Evaluate(
+                    tree, method, group,
+                    new MetadataReference[]
+                    {
+                        externalCompilation.ToMetadataReference()
+                    });
+
+                AssertEqual(RefactorSafetyStatus.Unsupported,
+                    result.Status);
+                AssertTrue(!result.Reasons.Contains(
+                    "SemanticAnalysisUnavailable"),
+                    "Bridge could not process compilation reference.");
+                AssertTrue(result.Reasons.Contains(
+                    "CompilationDiagnosticsPresent"),
+                    "Expected diagnostics without core references.");
+            });
+        Run(results,
             "RefactorBridge: explicit references",
             () =>
             {
