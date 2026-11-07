@@ -20,8 +20,7 @@ public static class RefactorSemanticBridge
             return Unsupported("InvalidInput");
         }
 
-        if (!ReferenceEquals(
-            method.SyntaxTree, tree))
+        if (!ReferenceEquals(method.SyntaxTree, tree))
         {
             return Unsupported("SyntaxTreeMismatch");
         }
@@ -87,9 +86,36 @@ public static class RefactorSemanticBridge
             var model =
                 compilation.GetSemanticModel(tree);
 
-            return RefactorSafetyAnalyzer.Analyze(
-                model,
-                statements);
+            var result =
+                RefactorSafetyAnalyzer.Analyze(
+                    model,
+                    statements);
+
+            bool hasCompilationErrors =
+                compilation.GetDiagnostics()
+                    .Any(d =>
+                        d.Severity ==
+                        DiagnosticSeverity.Error);
+
+            if (!hasCompilationErrors)
+            {
+                return result;
+            }
+
+            var reasons = result.Reasons
+                .Concat(new[]
+                {
+                    "CompilationDiagnosticsPresent"
+                })
+                .Distinct()
+                .ToArray();
+
+            return new RefactorSafetyResult(
+                result.Status ==
+                    RefactorSafetyStatus.Unsupported
+                    ? RefactorSafetyStatus.Unsupported
+                    : RefactorSafetyStatus.ReviewRequired,
+                reasons);
         }
         catch (Exception)
         {

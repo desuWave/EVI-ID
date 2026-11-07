@@ -12,6 +12,7 @@ public static partial class UnitTestRunner
     private static void RunRefactorSemanticBridgeTests(
         List<UnitTestResult> results)
     {
+        RunBridgeDiagnosticsTests(results);
         Run(
             results,
             "RefactorBridge: matching statements",
@@ -177,6 +178,44 @@ public static partial class UnitTestRunner
                     result.Reasons.Contains(
                         "InvalidSourceSpan"),
                     "Expected invalid span reason.");
+            });
+    }
+
+    private static void RunBridgeDiagnosticsTests(
+        List<UnitTestResult> results)
+    {
+        Run(results,
+            "RefactorBridge: missing type diagnostics",
+            () =>
+            {
+                string source = MakeBridgeTestSource()
+                    .Replace("int value0 = 0;",
+                             "MissingType value0 = null;");
+
+                string report = new RefactorEngine()
+                    .AnalyzeSource("Missing.cs", source,
+                                   maxMethodLines: 1);
+
+                AssertTrue(report.Contains(
+                    "CompilationDiagnosticsPresent"),
+                    "Missing compilation diagnostic.");
+            });
+
+        Run(results,
+            "RefactorBridge: diagnostics retain safety",
+            () =>
+            {
+                string report = new RefactorEngine()
+                    .AnalyzeSource("BridgeTest.cs",
+                        MakeBridgeTestSource(),
+                        maxMethodLines: 1);
+
+                AssertTrue(report.Contains(
+                    "SemanticSafety: ReviewRequired"),
+                    "Safety status was lost.");
+                AssertTrue(report.Contains(
+                    "CompilationDiagnosticsPresent"),
+                    "Expected incomplete compilation context.");
             });
     }
 
