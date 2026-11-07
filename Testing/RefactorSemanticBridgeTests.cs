@@ -185,6 +185,40 @@ public static partial class UnitTestRunner
         List<UnitTestResult> results)
     {
         Run(results,
+            "RefactorBridge: syntax error classification",
+            () =>
+            {
+                string source = MakeBridgeTestSource()
+                    .Replace("int value0 = 0;",
+                             "int value0 = ;");
+
+                string report = new RefactorEngine()
+                    .AnalyzeSource("Syntax.cs", source,
+                                   maxMethodLines: 1);
+
+                AssertTrue(report.Contains(
+                    "SyntaxErrorsPresent"),
+                    "Syntax errors were not classified.");
+            });
+
+        Run(results,
+            "RefactorBridge: unresolved symbol classification",
+            () =>
+            {
+                string source = MakeBridgeTestSource()
+                    .Replace("int value0 = 0;",
+                             "MissingType value0 = null;");
+
+                string report = new RefactorEngine()
+                    .AnalyzeSource("Missing.cs", source,
+                                   maxMethodLines: 1);
+
+                AssertTrue(report.Contains(
+                    "UnresolvedSymbolsOrReferences"),
+                    "Unresolved symbols were not classified.");
+            });
+
+        Run(results,
             "RefactorBridge: missing type diagnostics",
             () =>
             {

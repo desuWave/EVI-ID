@@ -102,11 +102,30 @@ public static class RefactorSemanticBridge
                 return result;
             }
 
+            bool syntaxErrors = tree.GetDiagnostics()
+                .Any(d => d.Severity ==
+                    DiagnosticSeverity.Error);
+
+            bool unresolvedSymbols =
+                compilation.GetDiagnostics().Any(d =>
+                    d.Severity == DiagnosticSeverity.Error &&
+                    (d.Id == "CS0246" ||
+                     d.Id == "CS0234" ||
+                     d.Id == "CS0012" ||
+                     d.Id == "CS0518" ||
+                     d.Id == "CS1069"));
+
             var reasons = result.Reasons
                 .Concat(new[]
                 {
                     "CompilationDiagnosticsPresent"
                 })
+                .Concat(syntaxErrors
+                    ? new[] { "SyntaxErrorsPresent" }
+                    : Array.Empty<string>())
+                .Concat(unresolvedSymbols
+                    ? new[] { "UnresolvedSymbolsOrReferences" }
+                    : Array.Empty<string>())
                 .Distinct()
                 .ToArray();
 
