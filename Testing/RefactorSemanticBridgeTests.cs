@@ -27,7 +27,8 @@ public static partial class UnitTestRunner
                     maxMethodLines: 1);
 
                 AssertTrue(
-                    report.Contains("SemanticSafety: ReviewRequired"),
+                    report.Contains(
+                        "SemanticSafety: ReviewRequired"),
                     "Expected semantic review result.");
 
                 AssertTrue(
@@ -89,6 +90,93 @@ public static partial class UnitTestRunner
                     result.Reasons.Contains(
                         "StatementMappingUnavailable"),
                     "Expected mapping failure reason.");
+            });
+
+        Run(
+            results,
+            "RefactorBridge: same-line span mapping",
+            () =>
+            {
+                string source =
+                    "class C { void M() { " +
+                    "int a = 1; int b = 2; " +
+                    "int c = a + b; } }";
+
+                var tree = CSharpSyntaxTree.ParseText(
+                    source);
+
+                var method = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+
+                var statements =
+                    method.Body!.Statements;
+
+                var group = new RefactorGroup(
+                    1, 1, 2, 1,
+                    "CandidateForExtraction",
+                    "Candidate",
+                    "None",
+                    "None",
+                    false,
+                    "None");
+
+                group.SetSourceSpan(
+                    statements[1].SpanStart,
+                    statements[2].Span.End);
+
+                var result =
+                    RefactorSemanticBridge.Evaluate(
+                        tree,
+                        method,
+                        group);
+
+                AssertEqual(
+                    RefactorSafetyStatus.ReviewRequired,
+                    result.Status);
+            });
+
+        Run(
+            results,
+            "RefactorBridge: invalid source span",
+            () =>
+            {
+                string source = MakeBridgeTestSource();
+
+                var tree = CSharpSyntaxTree.ParseText(
+                    source);
+
+                var method = tree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MethodDeclarationSyntax>()
+                    .Single();
+
+                var group = new RefactorGroup(
+                    1, 1, 1, 1,
+                    "CandidateForExtraction",
+                    "Candidate",
+                    "None",
+                    "None",
+                    false,
+                    "None");
+
+                group.SetSourceSpan(100, 50);
+
+                var result =
+                    RefactorSemanticBridge.Evaluate(
+                        tree,
+                        method,
+                        group);
+
+                AssertEqual(
+                    RefactorSafetyStatus.Unsupported,
+                    result.Status);
+
+                AssertTrue(
+                    result.Reasons.Contains(
+                        "InvalidSourceSpan"),
+                    "Expected invalid span reason.");
             });
     }
 

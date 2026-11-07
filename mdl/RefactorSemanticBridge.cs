@@ -20,27 +20,62 @@ public static class RefactorSemanticBridge
             return Unsupported("InvalidInput");
         }
 
-        var statements = method.Body.Statements
-            .Where(statement =>
+        if (!ReferenceEquals(
+            method.SyntaxTree, tree))
+        {
+            return Unsupported("SyntaxTreeMismatch");
+        }
+
+        StatementSyntax[] statements;
+
+        if (group.SpanStart >= 0 ||
+            group.SpanEnd >= 0)
+        {
+            if (group.SpanStart < 0 ||
+                group.SpanEnd <= group.SpanStart)
             {
-                var span = statement
-                    .GetLocation()
-                    .GetLineSpan();
+                return Unsupported("InvalidSourceSpan");
+            }
 
-                int start =
-                    span.StartLinePosition.Line + 1;
+            statements = method.Body.Statements
+                .Where(s =>
+                    s.SpanStart >= group.SpanStart &&
+                    s.Span.End <= group.SpanEnd)
+                .ToArray();
 
-                int end =
-                    span.EndLinePosition.Line + 1;
+            if (statements.Length == 0 ||
+                statements[0].SpanStart != group.SpanStart ||
+                statements[^1].Span.End != group.SpanEnd)
+            {
+                return Unsupported(
+                    "StatementMappingUnavailable");
+            }
+        }
+        else
+        {
+            statements = method.Body.Statements
+                .Where(statement =>
+                {
+                    var span = statement
+                        .GetLocation()
+                        .GetLineSpan();
 
-                return start >= group.StartLine &&
-                       end <= group.EndLine;
-            })
-            .ToArray();
+                    int start =
+                        span.StartLinePosition.Line + 1;
+
+                    int end =
+                        span.EndLinePosition.Line + 1;
+
+                    return start >= group.StartLine &&
+                           end <= group.EndLine;
+                })
+                .ToArray();
+        }
 
         if (statements.Length != group.StatementCount)
         {
-            return Unsupported("StatementMappingUnavailable");
+            return Unsupported(
+                "StatementMappingUnavailable");
         }
 
         try
@@ -58,7 +93,8 @@ public static class RefactorSemanticBridge
         }
         catch (Exception)
         {
-            return Unsupported("SemanticAnalysisUnavailable");
+            return Unsupported(
+                "SemanticAnalysisUnavailable");
         }
     }
 

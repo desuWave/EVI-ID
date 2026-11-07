@@ -57,6 +57,15 @@ public sealed class RefactorGroup
     
     public string LambdaKind { get; }
 
+    public int SpanStart { get; private set; } = -1;
+    public int SpanEnd { get; private set; } = -1;
+
+    public void SetSourceSpan(int start, int end)
+    {
+        SpanStart = start;
+        SpanEnd = end;
+    }
+
     public RefactorGroup(
         int startLine,
         int endLine,
@@ -1089,6 +1098,10 @@ groups.Add(
             exitLines,
             containsLambda,
             lambdaKind));
+
+    groups[groups.Count - 1].SetSourceSpan(
+        statements[0].SpanStart,
+        statements[statements.Count - 1].Span.End);
 }
 
 private static string GetControlFlowExitReason(
