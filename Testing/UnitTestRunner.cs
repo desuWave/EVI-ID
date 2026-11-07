@@ -442,6 +442,7 @@ public static partial class UnitTestRunner
                 testRoot);
 
             RunRefactorEngineTests(results);
+            RunRefactorSafetyAnalyzerTests(results);
 
             return FormatResults(
                 results,
@@ -453,7 +454,7 @@ public static partial class UnitTestRunner
                 new UnitTestResult(
                     "UNIT TEST RUNNER",
                     false,
-                    $"{ex.GetType().Name}: {ex.Message}"));
+                    ex.ToString()));
 
             return FormatResults(
                 results,
@@ -499,7 +500,7 @@ public static partial class UnitTestRunner
                 new UnitTestResult(
                     name,
                     false,
-                    $"{ex.GetType().Name}: {ex.Message}"));
+                    ex.ToString()));
         }
     }
 
