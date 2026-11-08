@@ -18,66 +18,18 @@ public static class SafReferenceDiagnostics
 
         try
         {
-            var folder = ExternalFolderManager
-                .GetFolders(context)
-                .FirstOrDefault(f =>
-                    ExternalFolderBrowser.GetRootDocumentId(
-                        f.UriString) == "primary:NTIRL_DATA" &&
-                    ExternalFolderManager.HasPersistedPermission(
-                        context,
-                        f.UriString));
-
-            if (folder is null)
-            {
-                output.AppendLine(
-                    "NTIRL_DATA: NOT REGISTERED");
-
-                return output.ToString();
-            }
+            var directory =
+                SafReferenceDirectoryResolver.Resolve(context);
 
             output.AppendLine(
                 "NTIRL_DATA: REGISTERED");
 
-            string documentId =
-                ExternalFolderBrowser.GetRootDocumentId(
-                    folder.UriString);
-
-            string[] directories =
-            {
-                "Projects",
-                "EVI-ID",
-                "EVI-ID-References",
-                "net8.0"
-            };
-
-            foreach (string name in directories)
-            {
-                var entry = ExternalFolderBrowser
-                    .GetChildren(
-                        context,
-                        folder.UriString,
-                        documentId)
-                    .FirstOrDefault(e =>
-                        e.IsDirectory &&
-                        e.Name.Equals(
-                            name,
-                            StringComparison.Ordinal));
-
-                if (entry is null)
-                {
-                    output.AppendLine(
-                        $"Directory missing: {name}");
-
-                    return output.ToString();
-                }
-
-                documentId = entry.DocumentId;
-            }
-
+            string treeUriString = directory.TreeUriString;
+            string documentId = directory.DocumentId;
             var file = ExternalFolderBrowser
                 .GetChildren(
                     context,
-                    folder.UriString,
+                    treeUriString,
                     documentId)
                 .FirstOrDefault(e =>
                     !e.IsDirectory &&
@@ -93,32 +45,17 @@ public static class SafReferenceDiagnostics
                 return output.ToString();
             }
 
-            var uri = SafFileSystem.BuildDocumentUri(
-                folder.UriString,
-                file.DocumentId);
+            var references =
+                SafMetadataReferenceLoader.Load(
+                    context,
+                    treeUriString,
+                    documentId,
+                    new[] { "System.Runtime.dll" });
 
-            using var stream = context.ContentResolver!
-                .OpenInputStream(uri)
-                ?? throw new IOException(
-                    "Cannot open reference assembly.");
-
-            using var memory = new MemoryStream();
-
-            stream.CopyTo(memory);
-
-            byte[] bytes = memory.ToArray();
+            var reference = references[0];
 
             output.AppendLine(
-                $"DLL bytes: {bytes.Length}");
-
-            var reference =
-                MetadataReference.CreateFromImage(bytes);
-
-            output.AppendLine(
-                reference is null
-                    ? "MetadataReference: NULL"
-                    : "MetadataReference: SUCCESS");
-
+                $"MetadataReferences loaded: {references.Count}");
             if (reference is not null)
             {
                 output.AppendLine();
@@ -128,6 +65,33 @@ public static class SafReferenceDiagnostics
                 output.AppendLine();
                 output.Append(
                     SafSemanticBridgeProbe.Run(reference));
+
+                output.AppendLine();
+                output.AppendLine("SAF Multi-Reference Loader Probe");
+
+                var multiple = SafMetadataReferenceLoader.Load(
+                    context,
+                    treeUriString,
+                    documentId,
+                    new[] { "System.Runtime.dll", "System.Console.dll" });
+
+                output.AppendLine(
+                    $"Multiple references loaded: {multiple.Count}");
+
+                try
+                {
+                    SafMetadataReferenceLoader.Load(
+                        context,
+                        treeUriString,
+                        documentId,
+                        new[] { "System.Runtime.dll", "EVI-ID-Missing-Test.dll" });
+
+                    output.AppendLine("Missing DLL test: FAILED");
+                }
+                catch (FileNotFoundException)
+                {
+                    output.AppendLine("Missing DLL test: PASS");
+                }
             }
         }
         catch (Exception ex)
