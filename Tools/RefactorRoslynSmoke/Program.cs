@@ -33,9 +33,16 @@ var resolved = RefactorSemanticBridge.Evaluate(
     tree, method, group, new MetadataReference[] { runtime, external.ToMetadataReference() });
 Check(!resolved.Reasons.Contains("Diagnostic:CS0246"), "explicit reference resolves external type");
 
+// RefactorEngine only emits semantic candidate details for groups
+// spanning at least 20 source lines. Exercise that path explicitly.
+var engineSource = "class C\n{\n    void M()\n    {\n" +
+    "        MissingWidget x = null;\n" +
+    string.Concat(Enumerable.Repeat("        x = null;\n", 21)) +
+    "    }\n}";
 var report = new RefactorEngine().AnalyzeSource(
-    "Smoke.cs", source, maxMethodLines: 1,
+    "Smoke.cs", engineSource, maxMethodLines: 1,
     references: new MetadataReference[] { runtime, external.ToMetadataReference() });
+Check(report.Contains("REFACTOR CANDIDATES:"), "engine finds an eligible extraction group");
 Check(report.Contains("SemanticSafety:"), "engine emits semantic safety");
 Check(report.Contains("SemanticReasons:"), "engine emits semantic reasons");
 Check(!report.Contains("Diagnostic:CS0246"), "engine forwards references");
