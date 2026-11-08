@@ -22,6 +22,7 @@
   Include="Microsoft.CodeAnalysis.CSharp"
   Version="5.9.0" />
   
+    <Compile Remove="Tools/**/*.cs" />
     <Compile Remove="EVI-ID.cproj" />
     <Compile Remove="EVI-ID.sln" />
   </ItemGroup>
