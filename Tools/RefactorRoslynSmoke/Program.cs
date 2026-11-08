@@ -20,6 +20,7 @@ var missing = RefactorSemanticBridge.Evaluate(tree, method, group);
 Check(missing.Status == RefactorSafetyStatus.Unsupported, "unresolved symbols block semantic safety");
 Check(missing.Reasons.Contains("Diagnostic:CS0246"), "unresolved type diagnostic retained");
 Check(missing.Reasons.Contains("UnresolvedSymbolsOrReferences"), "unresolved reference reason retained");
+Check(missing.Diagnostics.Any(d => d.Id == "CS0246" && d.Line == 1 && d.Column > 0 && d.Path == "Smoke.cs" && d.Message.Length > 0), "diagnostics include source location and message");
 
 var runtime = MetadataReference.CreateFromFile(typeof(object).Assembly.Location);
 var supplied = RefactorSemanticBridge.Evaluate(tree, method, group, new[] { runtime });
@@ -32,6 +33,7 @@ var external = CSharpCompilation.Create(
 var resolved = RefactorSemanticBridge.Evaluate(
     tree, method, group, new MetadataReference[] { runtime, external.ToMetadataReference() });
 Check(!resolved.Reasons.Contains("Diagnostic:CS0246"), "explicit reference resolves external type");
+Check(!resolved.Diagnostics.Any(d => d.Id == "CS0246"), "resolved type removed from detailed diagnostics");
 
 // RefactorEngine only emits semantic candidate details for groups
 // spanning at least 20 source lines. Exercise that path explicitly.
@@ -46,5 +48,8 @@ Check(report.Contains("REFACTOR CANDIDATES:"), "engine finds an eligible extract
 Check(report.Contains("SemanticSafety:"), "engine emits semantic safety");
 Check(report.Contains("SemanticReasons:"), "engine emits semantic reasons");
 Check(!report.Contains("Diagnostic:CS0246"), "engine forwards references");
+var unresolvedReport = new RefactorEngine().AnalyzeSource("Smoke.cs", engineSource, maxMethodLines: 1, references: new[] { runtime });
+Check(unresolvedReport.Contains("SemanticDiagnostic: CS0246 (Smoke.cs:"), "engine reports located semantic diagnostics");
+Check(unresolvedReport.Contains("SemanticSafety: Unsupported"), "diagnostics never relax safety");
 
 Console.WriteLine("Roslyn smoke tests passed.");

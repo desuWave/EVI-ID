@@ -14,17 +14,40 @@ public enum RefactorSafetyStatus
     Unsupported
 }
 
+public sealed class RefactorDiagnosticDetail
+{
+    public string Id { get; }
+    public string Message { get; }
+    public string Path { get; }
+    public int Line { get; }
+    public int Column { get; }
+
+    public RefactorDiagnosticDetail(string id, string message, string path, int line, int column)
+    {
+        Id = id;
+        Message = message;
+        Path = path;
+        Line = line;
+        Column = column;
+    }
+
+    public override string ToString() => $"{Id} ({Path}:{Line}:{Column}): {Message}";
+}
+
 public sealed class RefactorSafetyResult
 {
     public RefactorSafetyStatus Status { get; }
     public IReadOnlyList<string> Reasons { get; }
+    public IReadOnlyList<RefactorDiagnosticDetail> Diagnostics { get; }
 
     public RefactorSafetyResult(
         RefactorSafetyStatus status,
-        IEnumerable<string> reasons)
+        IEnumerable<string> reasons,
+        IEnumerable<RefactorDiagnosticDetail>? diagnostics = null)
     {
         Status = status;
         Reasons = reasons.ToArray();
+        Diagnostics = diagnostics?.ToArray() ?? Array.Empty<RefactorDiagnosticDetail>();
     }
 }
 

@@ -96,13 +96,11 @@ public static class RefactorSemanticBridge
                     model,
                     statements);
 
-            bool hasCompilationErrors =
-                compilation.GetDiagnostics()
-                    .Any(d =>
-                        d.Severity ==
-                        DiagnosticSeverity.Error);
+            var errors = compilation.GetDiagnostics()
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .ToArray();
 
-            if (!hasCompilationErrors)
+            if (errors.Length == 0)
             {
                 return result;
             }
@@ -111,14 +109,10 @@ public static class RefactorSemanticBridge
                 .Any(d => d.Severity ==
                     DiagnosticSeverity.Error);
 
-            bool unresolvedSymbols =
-                compilation.GetDiagnostics().Any(d =>
-                    d.Severity == DiagnosticSeverity.Error &&
-                    (d.Id == "CS0246" ||
-                     d.Id == "CS0234" ||
-                     d.Id == "CS0012" ||
-                     d.Id == "CS0518" ||
-                     d.Id == "CS1069"));
+            bool unresolvedSymbols = errors.Any(d =>
+                d.Id == "CS0246" || d.Id == "CS0234" ||
+                d.Id == "CS0012" || d.Id == "CS0518" ||
+                d.Id == "CS1069");
 
             var reasons = result.Reasons
                 .Concat(new[]
@@ -131,16 +125,26 @@ public static class RefactorSemanticBridge
                 .Concat(unresolvedSymbols
                     ? new[] { "UnresolvedSymbolsOrReferences" }
                     : Array.Empty<string>())
-                .Concat(compilation.GetDiagnostics()
-                    .Where(d =>
-                        d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => "Diagnostic:" + d.Id))
+                .Concat(errors.Select(d => "Diagnostic:" + d.Id))
                 .Distinct()
                 .ToArray();
 
+            var details = errors.Select(d =>
+            {
+                var span = d.Location.GetLineSpan();
+                bool hasSource = d.Location.IsInSource;
+                return new RefactorDiagnosticDetail(
+                    d.Id,
+                    d.GetMessage(System.Globalization.CultureInfo.InvariantCulture),
+                    hasSource ? span.Path : "<compilation>",
+                    hasSource ? span.StartLinePosition.Line + 1 : 0,
+                    hasSource ? span.StartLinePosition.Character + 1 : 0);
+            });
+
             return new RefactorSafetyResult(
                 RefactorSafetyStatus.Unsupported,
-                reasons);
+                reasons,
+                details);
         }
         catch (Exception)
         {

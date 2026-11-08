@@ -572,6 +572,10 @@ foreach (RefactorGroup group in groups)
 
     output.AppendLine(
         $"          SemanticReasons: {string.Join(",", semanticResult.Reasons)}");
+    foreach (var diagnostic in semanticResult.Diagnostics)
+    {
+        output.AppendLine($"          SemanticDiagnostic: {diagnostic}");
+    }
     output.AppendLine(  
         $"        Lines: " +  
         $"{group.StartLine}-{group.EndLine}");  
