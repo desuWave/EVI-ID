@@ -442,6 +442,7 @@ public static partial class UnitTestRunner
                 testRoot);
 
             RunRefactorEngineTests(results);
+            RunRefactorEngineReferenceTests(results);
             RunRefactorSafetyAnalyzerTests(results);
             RunRefactorSemanticBridgeTests(results);
 

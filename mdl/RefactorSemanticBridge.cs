@@ -84,7 +84,9 @@ public static class RefactorSemanticBridge
             var compilation = CSharpCompilation.Create(
                 "EVIRefactorSemanticAnalysis",
                 new[] { tree },
-                references: references);
+                references: references,
+                options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
 
             var model =
                 compilation.GetSemanticModel(tree);

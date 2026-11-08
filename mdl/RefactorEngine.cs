@@ -214,7 +214,8 @@ public sealed class RefactorEngine
         bool isDirectory,
         int maxFileLines = DefaultMaxFileLines,
         int maxMethodLines = DefaultMaxMethodLines,
-        int maxDepth = DefaultMaxDepth)
+        int maxDepth = DefaultMaxDepth,
+        IEnumerable<MetadataReference>? references = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
 
@@ -233,7 +234,8 @@ public sealed class RefactorEngine
                 source.Content,
                 maxFileLines,
                 maxMethodLines,
-                maxDepth);
+                maxDepth,
+                references);
         }
 
         StringBuilder output = new();
@@ -253,7 +255,8 @@ public sealed class RefactorEngine
                 source.Content,
                 maxFileLines,
                 maxMethodLines,
-                maxDepth));
+                maxDepth,
+                references));
         }
 
         return output.ToString();
@@ -264,7 +267,8 @@ public sealed class RefactorEngine
         string source,
         int maxFileLines = DefaultMaxFileLines,
         int maxMethodLines = DefaultMaxMethodLines,
-        int maxDepth = DefaultMaxDepth)
+        int maxDepth = DefaultMaxDepth,
+        IEnumerable<MetadataReference>? references = null)
     {
         if (string.IsNullOrWhiteSpace(sourceName))
         {
@@ -287,7 +291,8 @@ public sealed class RefactorEngine
             maxFileLines,
             maxMethodLines,
             maxDepth,
-            output);
+            output,
+            references);
 
         return output.ToString();
     }
@@ -298,7 +303,8 @@ string source,
 int maxFileLines,
 int maxMethodLines,
 int maxDepth,
-StringBuilder output)
+StringBuilder output,
+IEnumerable<MetadataReference>? references)
 {
 string normalizedSource =
 source
@@ -559,7 +565,7 @@ foreach (RefactorGroup group in groups)
 {  
     var semanticResult =
         RefactorSemanticBridge.Evaluate(
-            tree, method, group);
+            tree, method, group, references);
 
     output.AppendLine(
         $"          SemanticSafety: {semanticResult.Status}");
