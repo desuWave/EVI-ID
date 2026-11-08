@@ -1319,6 +1319,13 @@ case "page":
 
     return true;
 
+            case "refdiag":
+                AppendConsole(
+                    RuntimeReferenceDiagnostics.Run() + "\n" +
+                    SafReferenceDiagnostics.Run(this) + "\n");
+
+                return true;
+
                         case "utst":
             case "unit_test":
                 AppendConsole(
@@ -1502,6 +1509,13 @@ private void ShowCommandHelp(
                 "  Move output view by one screen.\n" +
                 "  Usage: page up\n" +
                 "  Usage: page down\n");
+            break;
+
+        case "refdiag":
+            AppendConsole(
+                "refdiag\n" +
+                "  Inspect runtime metadata references.\n" +
+                "  Usage: refdiag\n");
             break;
 
         case "utst":
