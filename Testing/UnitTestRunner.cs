@@ -443,6 +443,7 @@ public static partial class UnitTestRunner
 
             RunRefactorEngineTests(results);
             RunRefactorEngineReferenceTests(results);
+            RunMetadataReferenceResolverTests(results);
             RunRefactorSafetyAnalyzerTests(results);
             RunRefactorSemanticBridgeTests(results);
 
