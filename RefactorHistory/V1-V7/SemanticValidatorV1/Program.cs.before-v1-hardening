@@ -1,0 +1,130 @@
+using System;
+using System.Collections.Generic;
+
+var cases = new[]
+{
+    new
+    {
+        Name = "Independent local variables",
+        Source = """
+        public class Probe
+        {
+            public void Test()
+            {
+                int x = 10;
+                x++;
+            }
+        }
+        """,
+        Start = 0,
+        Count = 2,
+        Expected = "ReviewRequired"
+    },
+    new
+    {
+        Name = "External output dependency",
+        Source = """
+        public class Probe
+        {
+            public void Test()
+            {
+                int x = 10;
+                x++;
+                System.Console.WriteLine(x);
+            }
+        }
+        """,
+        Start = 0,
+        Count = 2,
+        Expected = "Unsupported"
+    },
+    new
+    {
+        Name = "External input dependency",
+        Source = """
+        public class Probe
+        {
+            public void Test()
+            {
+                int x = 10;
+                x++;
+                x++;
+            }
+        }
+        """,
+        Start = 1,
+        Count = 1,
+        Expected = "Unsupported"
+    },
+    new
+    {
+        Name = "Invalid statement range",
+        Source = """
+        public class Probe
+        {
+            public void Test()
+            {
+                int x = 10;
+            }
+        }
+        """,
+        Start = 5,
+        Count = 1,
+        Expected = "Unsupported"
+    },
+    new
+    {
+        Name = "Original compilation error",
+        Source = """
+        public class Probe
+        {
+            public void Test()
+            {
+                MissingWidget x = null;
+            }
+        }
+        """,
+        Start = 0,
+        Count = 1,
+        Expected = "Unsupported"
+    }
+};
+
+int passed = 0;
+
+Console.WriteLine("=== SEMANTIC VALIDATOR V1 ===");
+
+foreach (var test in cases)
+{
+    var result = SemanticExtractionValidator.Validate(
+        test.Source,
+        "Test",
+        test.Start,
+        test.Count);
+
+    bool ok = result.Status == test.Expected;
+
+    Console.WriteLine(
+        $"{test.Name}: {(ok ? "PASS" : "FAIL")}");
+
+    Console.WriteLine(
+        $"  Status: {result.Status}");
+
+    Console.WriteLine(
+        $"  Reason: {result.Reason}");
+
+    Console.WriteLine(
+        $"  Original errors: {result.OriginalErrors}");
+
+    Console.WriteLine(
+        $"  Transformed errors: {result.TransformedErrors}");
+
+    if (ok)
+        passed++;
+}
+
+Console.WriteLine(
+    $"RESULT: {passed}/{cases.Length} PASS");
+
+Environment.ExitCode =
+    passed == cases.Length ? 0 : 1;

@@ -1,0 +1,197 @@
+using System;
+using System.IO;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+internal sealed record ValidationResult(
+    string Status,
+    string Reason,
+    int OriginalErrors,
+    int TransformedErrors);
+
+internal static class SemanticExtractionValidator
+{
+    private static readonly MetadataReference[] References =
+        ((string?)AppContext.GetData(
+            "TRUSTED_PLATFORM_ASSEMBLIES"))
+        ?.Split(Path.PathSeparator)
+        .Select(path =>
+            MetadataReference.CreateFromFile(path))
+        .ToArray()
+        ?? throw new InvalidOperationException(
+            "Runtime references unavailable.");
+
+    public static ValidationResult Validate(
+        string source,
+        string methodName,
+        int startStatement,
+        int statementCount)
+    {
+        ValidationResult Reject(string reason) =>
+            new("Unsupported", reason, 0, 0);
+
+        if (string.IsNullOrWhiteSpace(source) ||
+            string.IsNullOrWhiteSpace(methodName) ||
+            startStatement < 0 ||
+            statementCount < 1)
+            return Reject("InvalidInput");
+
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var root = tree.GetCompilationUnitRoot();
+
+        var methods = root.DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Where(m => m.Identifier.ValueText == methodName)
+            .ToArray();
+
+        if (methods.Length != 1)
+            return Reject("MethodNotUnique");
+
+        var method = methods[0];
+
+        if (method.Parent is not ClassDeclarationSyntax owner ||
+            method.Body is null ||
+            method.ReturnType is not PredefinedTypeSyntax returnType ||
+            !returnType.Keyword.IsKind(SyntaxKind.VoidKeyword) ||
+            method.ParameterList.Parameters.Count != 0 ||
+            method.Modifiers.Any(SyntaxKind.StaticKeyword) ||
+            method.TypeParameterList is not null)
+            return Reject("UnsupportedMethodShape");
+
+        var body = method.Body;
+
+        if (startStatement > body.Statements.Count ||
+            statementCount > body.Statements.Count - startStatement)
+            return Reject("InvalidStatementRange");
+
+        var selected = body.Statements
+            .Skip(startStatement)
+            .Take(statementCount)
+            .ToArray();
+
+        var originalCompilation = Compile(tree, "Original");
+        var originalErrors = ErrorCount(originalCompilation);
+
+        if (originalErrors != 0)
+            return new(
+                "Unsupported",
+                "OriginalCompilationErrors",
+                originalErrors,
+                0);
+
+        var model = originalCompilation.GetSemanticModel(tree);
+
+        var control = model.AnalyzeControlFlow(
+            selected[0], selected[^1]);
+
+        var data = model.AnalyzeDataFlow(
+            selected[0], selected[^1]);
+
+        if (control is null ||
+            data is null ||
+            !control.Succeeded ||
+            !data.Succeeded)
+            return Reject("FlowAnalysisUnavailable");
+
+        if (control.EntryPoints.Any() ||
+            control.ExitPoints.Any() ||
+            data.DataFlowsIn.Any() ||
+            data.DataFlowsOut.Any() ||
+            data.Captured.Any())
+            return Reject("FlowDependenciesPresent");
+
+        var nodes = selected
+            .SelectMany(s => s.DescendantNodesAndSelf())
+            .ToArray();
+
+        if (nodes.Any(n =>
+            n is ReturnStatementSyntax ||
+            n is BreakStatementSyntax ||
+            n is ContinueStatementSyntax ||
+            n is GotoStatementSyntax ||
+            n is ThrowStatementSyntax ||
+            n is YieldStatementSyntax ||
+            n is AwaitExpressionSyntax ||
+            n is LocalFunctionStatementSyntax ||
+            n is AnonymousFunctionExpressionSyntax))
+            return Reject("ComplexExecution");
+
+        const string helperName =
+            "__EVI_ExtractionValidation_Helper";
+
+        if (owner.Members
+            .OfType<MethodDeclarationSyntax>()
+            .Any(m => m.Identifier.ValueText == helperName))
+            return Reject("HelperNameConflict");
+
+        var helper = SyntaxFactory.MethodDeclaration(
+                SyntaxFactory.PredefinedType(
+                    SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
+                helperName)
+            .AddModifiers(
+                SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+            .WithBody(SyntaxFactory.Block(selected));
+
+        var call = SyntaxFactory.ParseStatement(
+            helperName + "();");
+
+        var updatedStatements = body.Statements
+            .Take(startStatement)
+            .Concat(new[] { call })
+            .Concat(body.Statements.Skip(
+                startStatement + statementCount))
+            .ToArray();
+
+        var updatedMethod = method.WithBody(
+            body.WithStatements(
+                SyntaxFactory.List(updatedStatements)));
+
+        var updatedOwner = owner
+            .ReplaceNode(method, updatedMethod)
+            .AddMembers(helper);
+
+        var updatedRoot = root.ReplaceNode(
+            owner, updatedOwner);
+
+        var transformedTree = CSharpSyntaxTree.ParseText(
+            updatedRoot.NormalizeWhitespace().ToFullString());
+
+        var transformedErrors = ErrorCount(
+            Compile(transformedTree, "Transformed"));
+
+        if (transformedErrors != 0)
+            return new(
+                "Unsupported",
+                "TransformedCompilationErrors",
+                originalErrors,
+                transformedErrors);
+
+        return new(
+            "ReviewRequired",
+            "BehavioralEquivalenceNotProven",
+            originalErrors,
+            transformedErrors);
+    }
+
+    private static CSharpCompilation Compile(
+        SyntaxTree tree,
+        string name)
+    {
+        return CSharpCompilation.Create(
+            name,
+            new[] { tree },
+            References,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static int ErrorCount(
+        CSharpCompilation compilation)
+    {
+        return compilation.GetDiagnostics()
+            .Count(d =>
+                d.Severity == DiagnosticSeverity.Error);
+    }
+}

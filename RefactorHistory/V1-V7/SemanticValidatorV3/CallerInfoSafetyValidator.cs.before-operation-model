@@ -1,0 +1,57 @@
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+internal static class CallerInfoSafetyValidator
+{
+    public static bool HasImplicitCallerInfo(
+        SemanticModel model,
+        SyntaxNode[] nodes)
+    {
+        foreach (var invocation in nodes
+            .OfType<InvocationExpressionSyntax>())
+        {
+            if (model.GetSymbolInfo(invocation).Symbol
+                is not IMethodSymbol method)
+                continue;
+
+            foreach (var parameter in method.Parameters)
+            {
+                if (!parameter.IsOptional)
+                    continue;
+
+                bool hasCallerAttribute =
+                    parameter.GetAttributes().Any(a =>
+                    {
+                        string? name =
+                            a.AttributeClass?.ToDisplayString();
+
+                        return name is
+                            "System.Runtime.CompilerServices.CallerMemberNameAttribute" or
+                            "System.Runtime.CompilerServices.CallerFilePathAttribute" or
+                            "System.Runtime.CompilerServices.CallerLineNumberAttribute";
+                    });
+
+                if (!hasCallerAttribute)
+                    continue;
+
+                bool explicitlyProvided =
+                    invocation.ArgumentList.Arguments
+                        .Any(a =>
+                            a.NameColon?.Name.Identifier.ValueText ==
+                            parameter.Name);
+
+                if (!explicitlyProvided)
+                {
+                    int position =
+                        method.Parameters.IndexOf(parameter);
+
+                    if (invocation.ArgumentList.Arguments.Count <= position)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}

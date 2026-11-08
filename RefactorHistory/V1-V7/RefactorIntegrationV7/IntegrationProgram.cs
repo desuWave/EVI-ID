@@ -1,0 +1,27 @@
+using System;
+
+Console.WriteLine(
+    "=== EVI-ID REFACTOR V7 INTEGRATION LAB ===");
+
+Console.WriteLine();
+Console.WriteLine("=== V7 RESULT ADAPTER TESTS ===");
+
+RefactorV7ResultAdapterTests.Run();
+
+Console.WriteLine();
+Console.WriteLine("=== V7 BRIDGE INTEGRATION TESTS ===");
+
+RefactorV7BridgeTests.Run();
+
+Console.WriteLine();
+Console.WriteLine("=== SHARED COMPILATION TESTS ===");
+
+RefactorV7SharedCompilationTests.Run();
+
+Console.WriteLine();
+Console.WriteLine();
+Console.WriteLine("=== MULTIFILE ENGINE INTEGRATION TESTS ===");
+
+RefactorV7MultiFileTests.Run();
+
+Console.WriteLine("All integration tests completed.");

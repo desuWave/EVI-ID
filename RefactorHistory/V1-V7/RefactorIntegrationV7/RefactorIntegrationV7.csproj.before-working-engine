@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.CodeAnalysis">
+      <HintPath>$(MSBuildSDKsPath)/../Roslyn/bincore/Microsoft.CodeAnalysis.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp">
+      <HintPath>$(MSBuildSDKsPath)/../Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+    </Reference>
+
+    <Compile Include="IntegrationProgram.cs" />
+    <Compile Include="RefactorV7ResultAdapter.cs" />
+    <Compile Include="RefactorV7ResultAdapterTests.cs" />
+    <Compile Include="RefactorV7BridgeTests.cs" />
+    <Compile Include="RefactorV7SharedCompilationTests.cs" />
+
+    <Compile Include="Original/RefactorEngine.cs" />
+    <Compile Include="Working/RefactorSemanticBridge.cs" />
+    <Compile Include="Original/RefactorSafetyAnalyzer.cs" />
+
+    <Compile Include="Validator/SemanticExtractionValidator.cs" />
+    <Compile Include="Validator/SemanticExtractionIntegration.cs" />
+    <Compile Include="Validator/SymbolBindingPreservationValidator.cs" />
+    <Compile Include="Validator/CallerInfoSafetyValidator.cs" />
+  </ItemGroup>
+</Project>

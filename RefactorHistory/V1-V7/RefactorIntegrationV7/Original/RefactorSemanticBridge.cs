@@ -1,0 +1,163 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace EVI_Refactor;
+
+public static class RefactorSemanticBridge
+{
+    public static RefactorSafetyResult Evaluate(
+        SyntaxTree tree,
+        MethodDeclarationSyntax method,
+        RefactorGroup group,
+        IEnumerable<MetadataReference>? references = null)
+    {
+        if (tree == null ||
+            method?.Body == null ||
+            group == null)
+        {
+            return Unsupported("InvalidInput");
+        }
+
+        if (!ReferenceEquals(method.SyntaxTree, tree))
+        {
+            return Unsupported("SyntaxTreeMismatch");
+        }
+
+        StatementSyntax[] statements;
+
+        if (group.SpanStart >= 0 ||
+            group.SpanEnd >= 0)
+        {
+            if (group.SpanStart < 0 ||
+                group.SpanEnd <= group.SpanStart)
+            {
+                return Unsupported("InvalidSourceSpan");
+            }
+
+            statements = method.Body.Statements
+                .Where(s =>
+                    s.SpanStart >= group.SpanStart &&
+                    s.Span.End <= group.SpanEnd)
+                .ToArray();
+
+            if (statements.Length == 0 ||
+                statements[0].SpanStart != group.SpanStart ||
+                statements[^1].Span.End != group.SpanEnd)
+            {
+                return Unsupported(
+                    "StatementMappingUnavailable");
+            }
+        }
+        else
+        {
+            statements = method.Body.Statements
+                .Where(statement =>
+                {
+                    var span = statement
+                        .GetLocation()
+                        .GetLineSpan();
+
+                    int start =
+                        span.StartLinePosition.Line + 1;
+
+                    int end =
+                        span.EndLinePosition.Line + 1;
+
+                    return start >= group.StartLine &&
+                           end <= group.EndLine;
+                })
+                .ToArray();
+        }
+
+        if (statements.Length != group.StatementCount)
+        {
+            return Unsupported(
+                "StatementMappingUnavailable");
+        }
+
+        try
+        {
+            var compilation = CSharpCompilation.Create(
+                "EVIRefactorSemanticAnalysis",
+                new[] { tree },
+                references: references,
+                options: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary));
+
+            var model =
+                compilation.GetSemanticModel(tree);
+
+            var result =
+                RefactorSafetyAnalyzer.Analyze(
+                    model,
+                    statements);
+
+            var errors = compilation.GetDiagnostics()
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .ToArray();
+
+            if (errors.Length == 0)
+            {
+                return result;
+            }
+
+            bool syntaxErrors = tree.GetDiagnostics()
+                .Any(d => d.Severity ==
+                    DiagnosticSeverity.Error);
+
+            bool unresolvedSymbols = errors.Any(d =>
+                d.Id == "CS0246" || d.Id == "CS0234" ||
+                d.Id == "CS0012" || d.Id == "CS0518" ||
+                d.Id == "CS1069");
+
+            var reasons = result.Reasons
+                .Concat(new[]
+                {
+                    "CompilationDiagnosticsPresent"
+                })
+                .Concat(syntaxErrors
+                    ? new[] { "SyntaxErrorsPresent" }
+                    : Array.Empty<string>())
+                .Concat(unresolvedSymbols
+                    ? new[] { "UnresolvedSymbolsOrReferences" }
+                    : Array.Empty<string>())
+                .Concat(errors.Select(d => "Diagnostic:" + d.Id))
+                .Distinct()
+                .ToArray();
+
+            var details = errors.Select(d =>
+            {
+                var span = d.Location.GetLineSpan();
+                bool hasSource = d.Location.IsInSource;
+                return new RefactorDiagnosticDetail(
+                    d.Id,
+                    d.GetMessage(System.Globalization.CultureInfo.InvariantCulture),
+                    hasSource ? span.Path : "<compilation>",
+                    hasSource ? span.StartLinePosition.Line + 1 : 0,
+                    hasSource ? span.StartLinePosition.Character + 1 : 0);
+            });
+
+            return new RefactorSafetyResult(
+                RefactorSafetyStatus.Unsupported,
+                reasons,
+                details);
+        }
+        catch (Exception)
+        {
+            return Unsupported(
+                "SemanticAnalysisUnavailable");
+        }
+    }
+
+    private static RefactorSafetyResult Unsupported(
+        string reason)
+    {
+        return new RefactorSafetyResult(
+            RefactorSafetyStatus.Unsupported,
+            new[] { reason });
+    }
+}

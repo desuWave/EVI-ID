@@ -1,0 +1,133 @@
+using System;
+using System.IO;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+var tests = new[]
+{
+    (
+        Name: "Numeric overload",
+        Members: """
+private static void Pick(int value) { }
+private static void Pick(long value) { }
+""",
+        Statement: "Pick(42);"
+    ),
+    (
+        Name: "Null overload",
+        Members: """
+private static void Pick(object? value) { }
+private static void Pick(string? value) { }
+""",
+        Statement: "Pick(null);"
+    ),
+    (
+        Name: "Optional parameter overload",
+        Members: """
+private static void Pick(int value) { }
+private static void Pick(int value, int extra = 10) { }
+""",
+        Statement: "Pick(42);"
+    )
+};
+
+var references = ((string)AppContext.GetData(
+        "TRUSTED_PLATFORM_ASSEMBLIES")!)
+    .Split(Path.PathSeparator)
+    .Select(path => MetadataReference.CreateFromFile(path))
+    .ToArray();
+
+int passed = 0;
+
+Console.WriteLine("=== OVERLOAD BINDING PROBE ===");
+
+foreach (var test in tests)
+{
+    string original = $$"""
+public class Probe
+{
+    {{test.Members}}
+
+    public void Test()
+    {
+        {{test.Statement}}
+    }
+}
+""";
+
+    string transformed = $$"""
+public class Probe
+{
+    {{test.Members}}
+
+    public void Test()
+    {
+        __Extracted();
+    }
+
+    private static void __Extracted()
+    {
+        {{test.Statement}}
+    }
+}
+""";
+
+    var before = Analyze(original);
+    var after = Analyze(transformed);
+
+    bool pass =
+        before.Errors == 0 &&
+        after.Errors == 0 &&
+        before.Symbol is not null &&
+        after.Symbol is not null &&
+        before.Symbol == after.Symbol;
+
+    if (pass)
+        passed++;
+
+    Console.WriteLine($"\n{test.Name}: {(pass ? "PASS" : "REVIEW")}");
+    Console.WriteLine($"  Original: {before.Symbol ?? "null"}");
+    Console.WriteLine($"  Extracted: {after.Symbol ?? "null"}");
+    Console.WriteLine($"  Original errors: {before.Errors}");
+    Console.WriteLine($"  Transformed errors: {after.Errors}");
+}
+
+Console.WriteLine($"\nRESULT: {passed}/{tests.Length} PASS");
+Environment.ExitCode = passed == tests.Length ? 0 : 1;
+
+(string? Symbol, int Errors) Analyze(string source)
+{
+    var tree = CSharpSyntaxTree.ParseText(source);
+
+    var compilation = CSharpCompilation.Create(
+        "OverloadBindingProbe",
+        new[] { tree },
+        references,
+        new CSharpCompilationOptions(
+            OutputKind.DynamicallyLinkedLibrary));
+
+    var model = compilation.GetSemanticModel(tree);
+
+    var invocation = tree.GetRoot()
+        .DescendantNodes()
+        .OfType<InvocationExpressionSyntax>()
+        .Single(node =>
+            node.Expression is IdentifierNameSyntax name &&
+            name.Identifier.ValueText == "Pick");
+
+    var symbol = model.GetSymbolInfo(invocation).Symbol;
+
+    int errors = compilation.GetDiagnostics()
+        .Count(d => d.Severity == DiagnosticSeverity.Error);
+
+    string? signature = symbol is IMethodSymbol method
+        ? $"{method.ContainingType.ToDisplayString()}::{method.Name}({string.Join(", ", method.Parameters.Select(p => p.Type.ToDisplayString()))})"
+        : null;
+
+    Console.WriteLine("  [DIAG-989] Analyze reached");
+    Console.WriteLine($"  [DIAG-989] Symbol type: {symbol?.GetType().FullName ?? "null"}");
+    Console.WriteLine($"  [DIAG-989] Signature: {signature ?? "null"}");
+    return (signature, errors);
+}
