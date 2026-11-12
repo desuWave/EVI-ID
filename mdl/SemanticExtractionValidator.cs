@@ -79,8 +79,18 @@ internal static class SemanticExtractionValidator
         MethodDeclarationSyntax method,
         IReadOnlyList<StatementSyntax> statements)
     {
-        ValidationResult Reject(string reason) =>
-            new("Unsupported", reason, false, false, null, null);
+        return ValidateWithTree(
+            originalCompilation, method, statements).Validation;
+    }
+
+    internal static ValidatedExtraction ValidateWithTree(
+        CSharpCompilation originalCompilation,
+        MethodDeclarationSyntax method,
+        IReadOnlyList<StatementSyntax> statements)
+    {
+        ValidatedExtraction Reject(string reason) =>
+            new(new ValidationResult(
+                "Unsupported", reason, false, false, null, null), null);
 
         if (originalCompilation is null ||
             method is null ||
@@ -125,9 +135,10 @@ internal static class SemanticExtractionValidator
         var selected = statements.ToArray();
         int originalErrors = ErrorCount(originalCompilation);
 
-        ValidationResult RejectAfterOriginal(string reason) =>
-            new("Unsupported", reason, true, false,
-                originalErrors, null);
+        ValidatedExtraction RejectAfterOriginal(string reason) =>
+            new(new ValidationResult(
+                "Unsupported", reason, true, false,
+                originalErrors, null), null);
 
         if (originalErrors != 0)
             return RejectAfterOriginal(
@@ -224,7 +235,7 @@ internal static class SemanticExtractionValidator
                   "ImplicitCallerInfoDependency");
 
         const string helperName =
-            "__EVI_ExtractionValidation_Helper";
+            ExtractionTransformationBuilder.HelperName;
 
         if (owner.Members
             .OfType<MethodDeclarationSyntax>()
@@ -232,92 +243,67 @@ internal static class SemanticExtractionValidator
             return RejectAfterOriginal(
                 "HelperNameConflict");
 
-        var helper = SyntaxFactory.MethodDeclaration(
-                SyntaxFactory.PredefinedType(
-                    SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
-                helperName)
-            .AddModifiers(
-                SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
-            .WithBody(SyntaxFactory.Block(selected));
+        var transformedTree =
+            ExtractionTransformationBuilder.Build(
+                method, selected);
 
-        var call = SyntaxFactory.ParseStatement(
-            helperName + "();");
+        var transformedCompilation =
+            originalCompilation.ReplaceSyntaxTree(
+                tree, transformedTree);
 
-        var updatedStatements = body.Statements
-            .Take(startStatement)
-            .Concat(new[] { call })
-            .Concat(body.Statements.Skip(
-                startStatement + statementCount))
-            .ToArray();
-
-        var updatedMethod = method.WithBody(
-            body.WithStatements(
-                SyntaxFactory.List(updatedStatements)));
-
-        var updatedOwner = owner
-            .ReplaceNode(method, updatedMethod)
-            .AddMembers(helper);
-
-        var updatedRoot = root.ReplaceNode(
-            owner, updatedOwner);
-
-          var transformedTree = tree.WithRootAndOptions(
-              updatedRoot, tree.Options);
-
-          var transformedCompilation =
-              originalCompilation.ReplaceSyntaxTree(
-                  tree, transformedTree);
-
-          int transformedErrors =
-              ErrorCount(transformedCompilation);
+        int transformedErrors =
+            ErrorCount(transformedCompilation);
 
         if (transformedErrors != 0)
-            return new(
-                "Unsupported",
-                "TransformedCompilationErrors",
+            return new ValidatedExtraction(
+                new ValidationResult(
+                    "Unsupported",
+                    "TransformedCompilationErrors",
+                    true,
+                    true,
+                    originalErrors,
+                    transformedErrors), null);
+
+        var originalInvocations = selected
+            .SelectMany(s => s.DescendantNodesAndSelf())
+            .OfType<InvocationExpressionSyntax>()
+            .ToArray();
+
+        var transformedHelper = transformedTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(m =>
+                m.Identifier.ValueText == helperName);
+
+        var transformedInvocations = transformedHelper.Body!
+            .DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .ToArray();
+
+        var bindingResult =
+            SymbolBindingPreservationValidator.Validate(
+                model,
+                transformedCompilation.GetSemanticModel(
+                    transformedTree),
+                originalInvocations,
+                transformedInvocations);
+
+        if (!bindingResult.Preserved)
+            return new ValidatedExtraction(
+                new ValidationResult(
+                    "Unsupported",
+                    bindingResult.Reason,
+                    true, true,
+                    originalErrors, transformedErrors), null);
+
+        return new ValidatedExtraction(
+            new ValidationResult(
+                "ReviewRequired",
+                "BehavioralEquivalenceNotProven",
                 true,
                 true,
                 originalErrors,
-                transformedErrors);
-
-          var originalInvocations = selected
-              .SelectMany(s => s.DescendantNodesAndSelf())
-              .OfType<InvocationExpressionSyntax>()
-              .ToArray();
-
-          var transformedHelper = transformedTree.GetRoot()
-              .DescendantNodes()
-              .OfType<MethodDeclarationSyntax>()
-              .Single(m =>
-                  m.Identifier.ValueText == helperName);
-
-          var transformedInvocations = transformedHelper.Body!
-              .DescendantNodes()
-              .OfType<InvocationExpressionSyntax>()
-              .ToArray();
-
-          var bindingResult =
-              SymbolBindingPreservationValidator.Validate(
-                  model,
-                  transformedCompilation.GetSemanticModel(
-                      transformedTree),
-                  originalInvocations,
-                  transformedInvocations);
-
-          if (!bindingResult.Preserved)
-              return new(
-                  "Unsupported",
-                  bindingResult.Reason,
-                  true, true,
-                  originalErrors, transformedErrors);
-
-        return new(
-            "ReviewRequired",
-            "BehavioralEquivalenceNotProven",
-            true,
-            true,
-            originalErrors,
-            transformedErrors);
+                transformedErrors), transformedTree);
     }
 
     private static CSharpCompilation Compile(
