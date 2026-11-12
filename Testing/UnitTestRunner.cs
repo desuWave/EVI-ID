@@ -443,8 +443,12 @@ public static partial class UnitTestRunner
 
             RunRefactorEngineTests(results);
             RunRefactorEngineReferenceTests(results);
+            RunMetadataReferenceResolverTests(results);
+            RunRefactorCommandOptionsTests(results);
             RunRefactorSafetyAnalyzerTests(results);
             RunRefactorSemanticBridgeTests(results);
+            RunRefactorV7RegressionTests(results);
+            RunRefactorV7SemanticRuntimeTests(results, androidContext);
 
             return FormatResults(
                 results,

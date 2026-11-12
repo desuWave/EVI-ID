@@ -20,6 +20,29 @@ public static class SafFileSystem
             documentId);
     }
 
+    public static byte[] ReadBytes(
+        Context context,
+        string treeUriString,
+        string documentId)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(treeUriString);
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
+
+        var documentUri = BuildDocumentUri(
+            treeUriString,
+            documentId);
+
+        using var stream =
+            context.ContentResolver!.OpenInputStream(documentUri)
+            ?? throw new IOException(
+                $"Cannot open document for reading: {documentId}");
+
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
+    }
+
     public static string ReadTextFile(
         Context context,
         string treeUriString,

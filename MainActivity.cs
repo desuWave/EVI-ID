@@ -2081,7 +2081,8 @@ private void ExecuteRefactorCommand(
                 "EVI file system is not initialized.");
         }
 
-        string path = arguments[0];
+        var options = RefactorCommandOptions.Parse(arguments);
+        string path = options.Path;
 
         if (_fileSystem.Space == EVIFileSpace.Internal)
         {
@@ -2098,6 +2099,20 @@ private void ExecuteRefactorCommand(
                 path,
                 out bool isDirectory);
 
+        IEnumerable<Microsoft.CodeAnalysis.MetadataReference>? references = null;
+
+        if (options.AssemblyNames.Count > 0)
+        {
+            var directory =
+                SafReferenceDirectoryResolver.Resolve(this);
+
+            references = SafMetadataReferenceLoader.Load(
+                this,
+                directory.TreeUriString,
+                directory.DocumentId,
+                options.AssemblyNames);
+        }
+
         RefactorEngine engine = new();
 
         string report =
@@ -2107,7 +2122,8 @@ private void ExecuteRefactorCommand(
                 isDirectory,
                 500,
                 200,
-                10);
+                10,
+                references);
 
         AppendConsole(report);
         AppendConsole("Refactor exit code: 0\n");

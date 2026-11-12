@@ -7,8 +7,8 @@
     <RootNamespace>EVI_ID</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationId>com.x989.badapples.evi.id</ApplicationId>
-    <ApplicationTitle>EVI-ID</ApplicationTitle>
+    <ApplicationId>com.x989.badapples.evi.id.v7sandbox</ApplicationId>
+    <ApplicationTitle>EVI-ID V7 Sandbox</ApplicationTitle>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <AndroidSupportedAbis>arm64-v8a</AndroidSupportedAbis>
@@ -22,6 +22,8 @@
   Include="Microsoft.CodeAnalysis.CSharp"
   Version="5.9.0" />
   
+    <Compile Remove="Tools/**/*.cs" />
+    <Compile Remove="RefactorTestData/**/*.cs" />
     <Compile Remove="EVI-ID.cproj" />
     <Compile Remove="EVI-ID.sln" />
   </ItemGroup>

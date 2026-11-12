@@ -166,38 +166,21 @@ public sealed class RefactorEngine
                 files,
                 StringComparer.OrdinalIgnoreCase);
 
-            StringBuilder output =
-                new();
+            var sources = files
+                .Select(file => (
+                    Name: file,
+                    Content: File.ReadAllText(file)))
+                .ToArray();
 
-            output.AppendLine(
-                "EVI-Refactor Analysis");
+            string output = AnalyzeSources(
+                sourcePath,
+                sources,
+                isDirectory: true,
+                maxFileLines: maxFileLines,
+                maxMethodLines: maxMethodLines,
+                maxDepth: maxDepth);
 
-            output.AppendLine();
-
-            output.AppendLine(
-                $"Root: {sourcePath}");
-
-            output.AppendLine(
-                $"C# files: {files.Length}");
-
-            output.AppendLine();
-
-            foreach (string file in files)
-            {
-                string source =
-                    File.ReadAllText(file);
-
-                output.Append(
-                    AnalyzeSource(
-                        file,
-                        source,
-                        maxFileLines,
-                        maxMethodLines,
-                        maxDepth));
-            }
-
-            Console.Write(
-                output.ToString());
+            Console.Write(output);
 
             return 0;
         }
@@ -246,17 +229,35 @@ public sealed class RefactorEngine
         output.AppendLine($"C# files: {sources.Count}");
         output.AppendLine();
 
-        foreach (var source in sources.OrderBy(
+        var orderedSources = sources.OrderBy(
             x => x.Name,
-            StringComparer.OrdinalIgnoreCase))
+            StringComparer.OrdinalIgnoreCase).ToArray();
+
+        var trees = orderedSources.Select(source =>
+            CSharpSyntaxTree.ParseText(
+                source.Content,
+                path: source.Name)).ToArray();
+
+        var compilation = CSharpCompilation.Create(
+            "EVIRefactorSemanticAnalysis",
+            trees,
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        for (int i = 0; i < orderedSources.Length; i++)
         {
-            output.Append(AnalyzeSource(
+            var source = orderedSources[i];
+            AnalyzeSourceCore(
                 source.Name,
                 source.Content,
                 maxFileLines,
                 maxMethodLines,
                 maxDepth,
-                references));
+                output,
+                references,
+                trees[i],
+                compilation);
         }
 
         return output.ToString();
@@ -304,7 +305,9 @@ int maxFileLines,
 int maxMethodLines,
 int maxDepth,
 StringBuilder output,
-IEnumerable<MetadataReference>? references)
+IEnumerable<MetadataReference>? references,
+SyntaxTree? sharedTree = null,
+CSharpCompilation? sharedCompilation = null)
 {
 string normalizedSource =
 source
@@ -314,7 +317,7 @@ source
 string[] lines =  
         normalizedSource.Split('\n');  
 
-    SyntaxTree tree =  
+    SyntaxTree tree = sharedTree ??
         CSharpSyntaxTree.ParseText(  
             source,  
             path: sourceName);  
@@ -563,15 +566,21 @@ output.AppendLine(
 
 foreach (RefactorGroup group in groups)  
 {  
-    var semanticResult =
-        RefactorSemanticBridge.Evaluate(
-            tree, method, group, references);
+    var semanticResult = sharedCompilation is null
+        ? RefactorSemanticBridge.Evaluate(
+            tree, method, group, references)
+        : RefactorSemanticBridge.Evaluate(
+            tree, method, group, sharedCompilation);
 
     output.AppendLine(
         $"          SemanticSafety: {semanticResult.Status}");
 
     output.AppendLine(
         $"          SemanticReasons: {string.Join(",", semanticResult.Reasons)}");
+    foreach (var diagnostic in semanticResult.Diagnostics)
+    {
+        output.AppendLine($"          SemanticDiagnostic: {diagnostic}");
+    }
     output.AppendLine(  
         $"        Lines: " +  
         $"{group.StartLine}-{group.EndLine}");  
