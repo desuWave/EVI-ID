@@ -2063,25 +2063,131 @@ private async Task ExecuteGitCommandAsync(
     }
 }
 
-private void ExecuteRefactorCommand(
-    string[] arguments)
-{
-    if (arguments.Length < 1)
-    {
-        AppendConsole(
-            "Usage: refactor <file-or-directory>\n");
-        return;
-    }
+private RefactorAndroidSession? _refactorSession;
 
+private void ExecuteRefactorCommand(string[] arguments)
+{
     try
     {
         if (_fileSystem is null)
-        {
             throw new InvalidOperationException(
                 "EVI file system is not initialized.");
+
+        if (arguments.Length == 1 &&
+            arguments[0] == "--clear")
+        {
+            _refactorSession = null;
+            AppendConsole("Refactor session cleared.\n");
+            AppendConsole("Refactor exit code: 0\n");
+            return;
         }
 
-        var options = RefactorCommandOptions.Parse(arguments);
+        if (arguments.Length == 1 &&
+            arguments[0] == "--candidates")
+        {
+            var active = _refactorSession
+                ?? throw new InvalidOperationException(
+                    "No active discovery session.");
+
+            active.ValidateFileSpace(
+                _fileSystem.Space.ToString());
+
+            PrintRefactorCandidates(active.Discovery);
+            AppendConsole("Refactor exit code: 0\n");
+            return;
+        }
+
+        if (arguments.Length == 2 &&
+            arguments[0] == "--preview")
+        {
+            var active = _refactorSession
+                ?? throw new InvalidOperationException(
+                    "No active discovery session.");
+
+            active.ValidateFileSpace(
+                _fileSystem.Space.ToString());
+
+            var currentSources = _fileSystem.ReadCSharpSources(
+                active.Path, out _);
+
+            IEnumerable<Microsoft.CodeAnalysis.MetadataReference>?
+                currentReferences = null;
+
+            if (active.AssemblyNames.Count > 0)
+            {
+                var directory =
+                    SafReferenceDirectoryResolver.Resolve(this);
+
+                currentReferences = SafMetadataReferenceLoader.Load(
+                    this,
+                    directory.TreeUriString,
+                    directory.DocumentId,
+                    active.AssemblyNames);
+            }
+
+            var result = active.Discovery.PreviewById(
+                currentSources,
+                arguments[1],
+                currentReferences);
+
+            AppendConsole(
+                $"Preview status: {result.Status}\n" +
+                $"Reason: {result.Reason}\n" +
+                $"Original compilation checked: " +
+                $"{result.OriginalCompilationChecked}\n" +
+                $"Transformed compilation checked: " +
+                $"{result.TransformedCompilationChecked}\n");
+
+            if (result.OriginalErrors.HasValue)
+                AppendConsole(
+                    $"Original errors: {result.OriginalErrors}\n");
+
+            if (result.TransformedErrors.HasValue)
+                AppendConsole(
+                    $"Transformed errors: {result.TransformedErrors}\n");
+
+            if (result.HasPreview)
+            {
+                AppendConsole(
+                    "=== PREVIEW SOURCE (NOT APPLIED) ===\n");
+
+                AppendConsole(result.TransformedSource!);
+
+                AppendConsole(
+                    "\n=== END PREVIEW ===\n");
+            }
+
+            AppendConsole(
+                "No source files were modified.\n");
+            AppendConsole(
+                result.Status == "Unsupported"
+                    ? "Refactor exit code: 1\n"
+                    : "Refactor exit code: 0\n");
+            return;
+        }
+
+        if (arguments.Length < 1)
+        {
+            AppendConsole(
+                "Usage: refactor <path> " +
+                "[--refs names] [--discover]\n" +
+                "       refactor --candidates\n" +
+                "       refactor --preview <candidate-id>\n" +
+                "       refactor --clear\n");
+            return;
+        }
+
+        bool discover =
+            arguments.Length >= 2 &&
+            arguments[^1] == "--discover";
+
+        string[] parsedArguments = discover
+            ? arguments[..^1]
+            : arguments;
+
+        var options =
+            RefactorCommandOptions.Parse(parsedArguments);
+
         string path = options.Path;
 
         if (_fileSystem.Space == EVIFileSpace.Internal)
@@ -2094,12 +2200,11 @@ private void ExecuteRefactorCommand(
                 fullPath);
         }
 
-        var sources =
-            _fileSystem.ReadCSharpSources(
-                path,
-                out bool isDirectory);
+        var sources = _fileSystem.ReadCSharpSources(
+            path, out bool isDirectory);
 
-        IEnumerable<Microsoft.CodeAnalysis.MetadataReference>? references = null;
+        IEnumerable<Microsoft.CodeAnalysis.MetadataReference>?
+            references = null;
 
         if (options.AssemblyNames.Count > 0)
         {
@@ -2115,29 +2220,66 @@ private void ExecuteRefactorCommand(
 
         RefactorEngine engine = new();
 
-        string report =
-            engine.AnalyzeSources(
+        if (discover)
+        {
+            _refactorSession = null;
+
+            var discovery = engine.DiscoverGroups(
+                sources, 500, 200, 10, references);
+
+            var session =
+                new RefactorDiscoverySession(discovery);
+
+            var active = new RefactorAndroidSession(
+                session,
                 path,
-                sources,
-                isDirectory,
-                500,
-                200,
-                10,
-                references);
+                _fileSystem.Space.ToString(),
+                options.AssemblyNames);
+
+            _refactorSession = active;
+
+            PrintRefactorCandidates(session);
+
+            AppendConsole(
+                "Discovery is read-only.\n");
+            AppendConsole("Refactor exit code: 0\n");
+            return;
+        }
+
+        string report = engine.AnalyzeSources(
+            path, sources, isDirectory,
+            500, 200, 10, references);
 
         AppendConsole(report);
         AppendConsole("Refactor exit code: 0\n");
     }
     catch (Exception ex)
     {
-        Logger.Error(
-            $"Refactor command failed: {ex}");
+        Logger.Error($"Refactor command failed: {ex}");
         AppendConsole(
             $"{ex.GetType().Name}: {ex.Message}\n");
         AppendConsole("Refactor exit code: 1\n");
     }
 }
 
+private void PrintRefactorCandidates(
+    RefactorDiscoverySession session)
+{
+    AppendConsole(
+        $"Discovery candidates: {session.Candidates.Count}\n");
+    AppendConsole($"Session: {session.SessionId}\n");
+
+    foreach (var candidate in session.Candidates)
+    {
+        AppendConsole(
+            $"Candidate: {candidate.Id}\n" +
+            $"  Source: {candidate.SourceName}\n" +
+            $"  Method: {candidate.MethodName}\n" +
+            $"  Lines: {candidate.StartLine}-" +
+            $"{candidate.EndLine}\n" +
+            $"  Statements: {candidate.StatementCount}\n");
+    }
+}
     private void ExecuteWriteCommand(
         string[] arguments)
     {

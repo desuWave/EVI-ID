@@ -108,6 +108,24 @@ public sealed class RefactorPlan
 
 public sealed class RefactorEngine
 {
+    public RefactorGroupDiscovery DiscoverGroups(
+        IReadOnlyList<(string Name, string Content)> sources,
+        int maxFileLines = DefaultMaxFileLines,
+        int maxMethodLines = DefaultMaxMethodLines,
+        int maxDepth = DefaultMaxDepth,
+        IEnumerable<MetadataReference>? references = null)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        string hash = RefactorSourceIdentity.Compute(sources);
+        var discovered = new List<RefactorDiscoveredGroup>();
+        AnalyzeSourcesCore(
+            "<memory>", sources, maxFileLines,
+            maxMethodLines, maxDepth,
+            references, discovered);
+        return new RefactorGroupDiscovery(
+            hash, discovered.AsReadOnly());
+    }
+
     public const int DefaultMaxFileLines = 500;
     public const int DefaultMaxMethodLines = 100;
     public const int DefaultMaxDepth = 6;
@@ -166,38 +184,21 @@ public sealed class RefactorEngine
                 files,
                 StringComparer.OrdinalIgnoreCase);
 
-            StringBuilder output =
-                new();
+            var sources = files
+                .Select(file => (
+                    Name: file,
+                    Content: File.ReadAllText(file)))
+                .ToArray();
 
-            output.AppendLine(
-                "EVI-Refactor Analysis");
+            string output = AnalyzeSources(
+                sourcePath,
+                sources,
+                isDirectory: true,
+                maxFileLines: maxFileLines,
+                maxMethodLines: maxMethodLines,
+                maxDepth: maxDepth);
 
-            output.AppendLine();
-
-            output.AppendLine(
-                $"Root: {sourcePath}");
-
-            output.AppendLine(
-                $"C# files: {files.Length}");
-
-            output.AppendLine();
-
-            foreach (string file in files)
-            {
-                string source =
-                    File.ReadAllText(file);
-
-                output.Append(
-                    AnalyzeSource(
-                        file,
-                        source,
-                        maxFileLines,
-                        maxMethodLines,
-                        maxDepth));
-            }
-
-            Console.Write(
-                output.ToString());
+            Console.Write(output);
 
             return 0;
         }
@@ -238,6 +239,21 @@ public sealed class RefactorEngine
                 references);
         }
 
+        return AnalyzeSourcesCore(
+            sourcePath, sources, maxFileLines,
+            maxMethodLines, maxDepth,
+            references, null);
+    }
+
+    private static string AnalyzeSourcesCore(
+        string sourcePath,
+        IReadOnlyList<(string Name, string Content)> sources,
+        int maxFileLines,
+        int maxMethodLines,
+        int maxDepth,
+        IEnumerable<MetadataReference>? references,
+        List<RefactorDiscoveredGroup>? discovered)
+    {
         StringBuilder output = new();
 
         output.AppendLine("EVI-Refactor Analysis");
@@ -246,17 +262,35 @@ public sealed class RefactorEngine
         output.AppendLine($"C# files: {sources.Count}");
         output.AppendLine();
 
-        foreach (var source in sources.OrderBy(
+        var orderedSources = sources.OrderBy(
             x => x.Name,
-            StringComparer.OrdinalIgnoreCase))
+            StringComparer.OrdinalIgnoreCase).ToArray();
+
+        var trees = orderedSources.Select(source =>
+            CSharpSyntaxTree.ParseText(
+                source.Content,
+                path: source.Name)).ToArray();
+
+        var compilation = CSharpCompilation.Create(
+            "EVIRefactorSemanticAnalysis",
+            trees,
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        for (int i = 0; i < orderedSources.Length; i++)
         {
-            output.Append(AnalyzeSource(
+            var source = orderedSources[i];
+            AnalyzeSourceCore(
                 source.Name,
                 source.Content,
                 maxFileLines,
                 maxMethodLines,
                 maxDepth,
-                references));
+                output,
+                references,
+                trees[i],
+                compilation, discovered);
         }
 
         return output.ToString();
@@ -304,7 +338,10 @@ int maxFileLines,
 int maxMethodLines,
 int maxDepth,
 StringBuilder output,
-IEnumerable<MetadataReference>? references)
+IEnumerable<MetadataReference>? references,
+SyntaxTree? sharedTree = null,
+    CSharpCompilation? sharedCompilation = null,
+    List<RefactorDiscoveredGroup>? discovered = null)
 {
 string normalizedSource =
 source
@@ -314,7 +351,7 @@ source
 string[] lines =  
         normalizedSource.Split('\n');  
 
-    SyntaxTree tree =  
+    SyntaxTree tree = sharedTree ??
         CSharpSyntaxTree.ParseText(  
             source,  
             path: sourceName);  
@@ -563,9 +600,20 @@ output.AppendLine(
 
 foreach (RefactorGroup group in groups)  
 {  
-    var semanticResult =
-        RefactorSemanticBridge.Evaluate(
-            tree, method, group, references);
+    discovered?.Add(new RefactorDiscoveredGroup(
+        sourceName,
+        method.Identifier.ValueText,
+        method.SpanStart,
+        method.Span.End,
+        group,
+        group.SpanStart,
+        group.SpanEnd,
+        group.StatementCount));
+    var semanticResult = sharedCompilation is null
+        ? RefactorSemanticBridge.Evaluate(
+            tree, method, group, references)
+        : RefactorSemanticBridge.Evaluate(
+            tree, method, group, sharedCompilation);
 
     output.AppendLine(
         $"          SemanticSafety: {semanticResult.Status}");

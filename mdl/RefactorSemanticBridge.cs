@@ -15,6 +15,33 @@ public static class RefactorSemanticBridge
         RefactorGroup group,
         IEnumerable<MetadataReference>? references = null)
     {
+        if (tree == null || method?.Body == null || group == null)
+            return Unsupported("InvalidInput");
+
+        var compilation = CSharpCompilation.Create(
+            "EVIRefactorSemanticAnalysis",
+            new[] { tree },
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        return Evaluate(tree, method, group, compilation);
+    }
+
+    public static RefactorSafetyResult Evaluate(
+        SyntaxTree tree,
+        MethodDeclarationSyntax method,
+        RefactorGroup group,
+        CSharpCompilation compilation)
+    {
+        if (compilation == null)
+            return Unsupported("InvalidCompilation");
+
+        if (tree != null &&
+            !compilation.SyntaxTrees.Any(t =>
+                ReferenceEquals(t, tree)))
+            return Unsupported("CompilationTreeMismatch");
+
         if (tree == null ||
             method?.Body == null ||
             group == null)
@@ -27,66 +54,19 @@ public static class RefactorSemanticBridge
             return Unsupported("SyntaxTreeMismatch");
         }
 
-        StatementSyntax[] statements;
-
-        if (group.SpanStart >= 0 ||
-            group.SpanEnd >= 0)
+        if (!RefactorStatementMapper.TryMap(
+                method,
+                group,
+                out var mappedStatements,
+                out string mappingReason))
         {
-            if (group.SpanStart < 0 ||
-                group.SpanEnd <= group.SpanStart)
-            {
-                return Unsupported("InvalidSourceSpan");
-            }
-
-            statements = method.Body.Statements
-                .Where(s =>
-                    s.SpanStart >= group.SpanStart &&
-                    s.Span.End <= group.SpanEnd)
-                .ToArray();
-
-            if (statements.Length == 0 ||
-                statements[0].SpanStart != group.SpanStart ||
-                statements[^1].Span.End != group.SpanEnd)
-            {
-                return Unsupported(
-                    "StatementMappingUnavailable");
-            }
-        }
-        else
-        {
-            statements = method.Body.Statements
-                .Where(statement =>
-                {
-                    var span = statement
-                        .GetLocation()
-                        .GetLineSpan();
-
-                    int start =
-                        span.StartLinePosition.Line + 1;
-
-                    int end =
-                        span.EndLinePosition.Line + 1;
-
-                    return start >= group.StartLine &&
-                           end <= group.EndLine;
-                })
-                .ToArray();
+            return Unsupported(mappingReason);
         }
 
-        if (statements.Length != group.StatementCount)
-        {
-            return Unsupported(
-                "StatementMappingUnavailable");
-        }
-
+        StatementSyntax[] statements =
+            mappedStatements.ToArray();
         try
         {
-            var compilation = CSharpCompilation.Create(
-                "EVIRefactorSemanticAnalysis",
-                new[] { tree },
-                references: references,
-                options: new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary));
 
             var model =
                 compilation.GetSemanticModel(tree);
@@ -102,7 +82,15 @@ public static class RefactorSemanticBridge
 
             if (errors.Length == 0)
             {
-                return result;
+                var validation =
+                    SemanticExtractionIntegration.Validate(
+                        compilation,
+                        method,
+                        statements);
+
+                return RefactorV7ResultAdapter.Merge(
+                    result,
+                    validation);
             }
 
             bool syntaxErrors = tree.GetDiagnostics()

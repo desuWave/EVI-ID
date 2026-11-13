@@ -447,6 +447,9 @@ public static partial class UnitTestRunner
             RunRefactorCommandOptionsTests(results);
             RunRefactorSafetyAnalyzerTests(results);
             RunRefactorSemanticBridgeTests(results);
+            RunRefactorV7RegressionTests(results);
+            RunRefactorV7SemanticRuntimeTests(results, androidContext);
+            RunRefactorV7PreviewFormattingTests(results, androidContext);
 
             return FormatResults(
                 results,

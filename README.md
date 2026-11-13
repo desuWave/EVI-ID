@@ -84,3 +84,52 @@ The current implementation is experimental. Not all features have been fully tes
 Development may include improvements to the editor, build tools, project management, Git integration, diagnostics, and the overall interactive development experience.
 
 No stable release is currently declared.
+
+## Android Refactor(F) — Experimental
+
+EVI-ID includes an experimental C# source-code refactoring workflow
+powered by Roslyn and integrated into the Android command interface.
+
+### Current Capabilities
+
+- C# source analysis with explicitly supplied metadata references.
+- Refactoring candidate discovery for supported statement groups.
+- Session-based candidate identifiers.
+- Read-only preview of proposed method extraction.
+- Original and transformed compilation validation.
+- Semantic and safety checks for supported extraction scenarios.
+- Preview formatting for generated helper methods.
+- Android Storage Access Framework (SAF) integration.
+
+### Verified Android Tests
+
+The current development build completed 76 of 76 internal unit
+tests successfully, including Android semantic validation and
+preview-formatting regression coverage.
+
+A separate Android verification using
+`SemanticProbeIndependent.cs` discovered 11 extraction candidates.
+
+Preview of candidate 10 completed with:
+
+- Original compilation errors: 0.
+- Transformed compilation errors: 0.
+- Status: `ReviewRequired`.
+- Reason: `BehavioralEquivalenceNotProven`.
+- No source files modified.
+
+### Safety and Limitations
+
+Refactor(F) is experimental and is not production-ready.
+
+Successful compilation does not establish behavioral equivalence.
+The current preview workflow does not automatically apply
+transformations when behavioral equivalence remains unproven.
+
+Candidate identifiers are session-specific and must be obtained
+from the current discovery session.
+
+Preservation of comments, custom formatting, and additional
+language constructs requires further regression testing.
+
+The implementation and its safety checks are under active development.

@@ -23,6 +23,8 @@
   Version="5.9.0" />
   
     <Compile Remove="Tools/**/*.cs" />
+    <Compile Remove="**/SemanticProbe.cs" />
+    <Compile Remove="**/SemanticProbeLarge.cs" />
     <Compile Remove="EVI-ID.cproj" />
     <Compile Remove="EVI-ID.sln" />
   </ItemGroup>

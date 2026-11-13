@@ -1,0 +1,328 @@
+using System;
+using System.IO;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+internal sealed record ValidationResult(
+    string Status,
+    string Reason,
+    bool OriginalCompilationChecked,
+    bool TransformedCompilationChecked,
+    int? OriginalErrors,
+    int? TransformedErrors);
+
+internal static class SemanticExtractionValidator
+{
+    private static MetadataReference[] GetRuntimeReferences()
+    {
+        return ((string?)AppContext.GetData(
+            "TRUSTED_PLATFORM_ASSEMBLIES"))
+            ?.Split(Path.PathSeparator)
+            .Select(path => MetadataReference.CreateFromFile(path))
+            .ToArray()
+            ?? throw new InvalidOperationException(
+                "Runtime references unavailable.");
+    }
+
+    public static ValidationResult Validate(
+        string source,
+        string methodName,
+        int startStatement,
+        int statementCount)
+    {
+        ValidationResult Reject(string reason) =>
+            new("Unsupported", reason, false, false, null, null);
+
+        if (string.IsNullOrWhiteSpace(source) ||
+            string.IsNullOrWhiteSpace(methodName) ||
+            startStatement < 0 ||
+            statementCount < 1)
+            return Reject("InvalidInput");
+
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var root = tree.GetCompilationUnitRoot();
+
+        var methods = root.DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Where(m => m.Identifier.ValueText == methodName)
+            .ToArray();
+
+        if (methods.Length != 1)
+            return Reject("MethodNotUnique");
+
+        var method = methods[0];
+
+        if (method.Body is null)
+            return Reject("UnsupportedMethodShape");
+
+        var body = method.Body;
+
+        if (startStatement > body.Statements.Count ||
+            statementCount > body.Statements.Count - startStatement)
+            return Reject("InvalidStatementRange");
+
+        var selected = body.Statements
+            .Skip(startStatement)
+            .Take(statementCount)
+            .ToArray();
+
+        return Validate(
+            Compile(tree, "Original"),
+            method,
+            selected);
+    }
+
+    public static ValidationResult Validate(
+        CSharpCompilation originalCompilation,
+        MethodDeclarationSyntax method,
+        IReadOnlyList<StatementSyntax> statements)
+    {
+        return ValidateWithTree(
+            originalCompilation, method, statements).Validation;
+    }
+
+    internal static ValidatedExtraction ValidateWithTree(
+        CSharpCompilation originalCompilation,
+        MethodDeclarationSyntax method,
+        IReadOnlyList<StatementSyntax> statements)
+    {
+        ValidatedExtraction Reject(string reason) =>
+            new(new ValidationResult(
+                "Unsupported", reason, false, false, null, null), null);
+
+        if (originalCompilation is null ||
+            method is null ||
+            statements is null ||
+            statements.Count == 0)
+            return Reject("InvalidInput");
+
+        var tree = method.SyntaxTree;
+
+        if (tree is null ||
+            !originalCompilation.SyntaxTrees.Contains(tree))
+            return Reject("CompilationTreeMismatch");
+
+        if (method.Parent is not ClassDeclarationSyntax owner ||
+            method.Body is null ||
+            method.ReturnType is not PredefinedTypeSyntax returnType ||
+            !returnType.Keyword.IsKind(SyntaxKind.VoidKeyword) ||
+            method.ParameterList.Parameters.Count != 0 ||
+            method.Modifiers.Any(SyntaxKind.StaticKeyword) ||
+            method.Modifiers.Any(SyntaxKind.AsyncKeyword) ||
+            method.TypeParameterList is not null)
+            return Reject("UnsupportedMethodShape");
+
+        var body = method.Body;
+        var root = tree.GetCompilationUnitRoot();
+
+        int startStatement = body.Statements.IndexOf(statements[0]);
+
+        if (startStatement < 0 ||
+            statements.Count > body.Statements.Count - startStatement)
+            return Reject("InvalidStatementRange");
+
+        for (int i = 0; i < statements.Count; i++)
+        {
+            if (!ReferenceEquals(
+                body.Statements[startStatement + i],
+                statements[i]))
+                return Reject("NonContiguousStatements");
+        }
+
+        int statementCount = statements.Count;
+        var selected = statements.ToArray();
+        int originalErrors = ErrorCount(originalCompilation);
+
+        ValidatedExtraction RejectAfterOriginal(string reason) =>
+            new(new ValidationResult(
+                "Unsupported", reason, true, false,
+                originalErrors, null), null);
+
+        if (originalErrors != 0)
+            return RejectAfterOriginal(
+                "OriginalCompilationErrors");
+
+        var model = originalCompilation.GetSemanticModel(tree);
+
+        var control = model.AnalyzeControlFlow(
+            selected[0], selected[^1]);
+
+        var data = model.AnalyzeDataFlow(
+            selected[0], selected[^1]);
+
+        if (control is null ||
+            data is null ||
+            !control.Succeeded ||
+            !data.Succeeded)
+            return RejectAfterOriginal(
+                "FlowAnalysisUnavailable");
+
+        var nodes = selected
+            .SelectMany(s => s.DescendantNodesAndSelf())
+            .ToArray();
+
+        if (nodes.Any(n =>
+            n is ReturnStatementSyntax ||
+            n is BreakStatementSyntax ||
+            n is ContinueStatementSyntax ||
+            n is GotoStatementSyntax ||
+            n is ThrowStatementSyntax ||
+            n is YieldStatementSyntax ||
+            n is AwaitExpressionSyntax ||
+            n is LocalFunctionStatementSyntax ||
+            n is AnonymousFunctionExpressionSyntax ||
+            n is ThisExpressionSyntax ||
+            n is BaseExpressionSyntax ||
+            n is TryStatementSyntax ||
+            n is UsingStatementSyntax ||
+            n is LockStatementSyntax ||
+            n is FixedStatementSyntax ||
+            n is ForStatementSyntax ||
+            n is ForEachStatementSyntax ||
+            n is WhileStatementSyntax ||
+            n is DoStatementSyntax ||
+            n is SwitchStatementSyntax ||
+            n is IfStatementSyntax ||
+            n is BlockSyntax))
+            return RejectAfterOriginal("ComplexExecution");
+
+        foreach (var node in nodes)
+        {
+            if (node is not IdentifierNameSyntax identifier)
+                continue;
+
+            var symbol = model.GetSymbolInfo(identifier).Symbol;
+
+            if (symbol is IFieldSymbol field &&
+                !field.IsStatic)
+                return RejectAfterOriginal(
+                    "InstanceFieldAccess");
+
+            if (symbol is IPropertySymbol property &&
+                !property.IsStatic)
+                return RejectAfterOriginal(
+                    "InstancePropertyAccess");
+
+            if (symbol is IMethodSymbol methodSymbol &&
+                !methodSymbol.IsStatic &&
+                methodSymbol.MethodKind ==
+                    MethodKind.Ordinary)
+                return RejectAfterOriginal(
+                    "InstanceMethodAccess");
+        }
+
+        if (control.EntryPoints.Any() ||
+            control.ExitPoints.Any() ||
+            data.DataFlowsIn.Any() ||
+            data.DataFlowsOut.Any() ||
+            data.Captured.Any())
+            return RejectAfterOriginal(
+                "FlowDependenciesPresent");
+
+          if (nodes
+              .OfType<InvocationExpressionSyntax>()
+              .Any(invocation =>
+                  model.GetOperation(invocation)?.Kind ==
+                  OperationKind.NameOf))
+              return RejectAfterOriginal(
+                  "UnsupportedNameofExpression");
+
+          if (CallerInfoSafetyValidator.HasImplicitCallerInfo(
+              model, nodes))
+              return RejectAfterOriginal(
+                  "ImplicitCallerInfoDependency");
+
+        const string helperName =
+            ExtractionTransformationBuilder.HelperName;
+
+        if (owner.Members
+            .OfType<MethodDeclarationSyntax>()
+            .Any(m => m.Identifier.ValueText == helperName))
+            return RejectAfterOriginal(
+                "HelperNameConflict");
+
+        var transformedTree =
+            ExtractionTransformationBuilder.Build(
+                method, selected);
+
+        var transformedCompilation =
+            originalCompilation.ReplaceSyntaxTree(
+                tree, transformedTree);
+
+        int transformedErrors =
+            ErrorCount(transformedCompilation);
+
+        if (transformedErrors != 0)
+            return new ValidatedExtraction(
+                new ValidationResult(
+                    "Unsupported",
+                    "TransformedCompilationErrors",
+                    true,
+                    true,
+                    originalErrors,
+                    transformedErrors), null);
+
+        var originalInvocations = selected
+            .SelectMany(s => s.DescendantNodesAndSelf())
+            .OfType<InvocationExpressionSyntax>()
+            .ToArray();
+
+        var transformedHelper = transformedTree.GetRoot()
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(m =>
+                m.Identifier.ValueText == helperName);
+
+        var transformedInvocations = transformedHelper.Body!
+            .DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .ToArray();
+
+        var bindingResult =
+            SymbolBindingPreservationValidator.Validate(
+                model,
+                transformedCompilation.GetSemanticModel(
+                    transformedTree),
+                originalInvocations,
+                transformedInvocations);
+
+        if (!bindingResult.Preserved)
+            return new ValidatedExtraction(
+                new ValidationResult(
+                    "Unsupported",
+                    bindingResult.Reason,
+                    true, true,
+                    originalErrors, transformedErrors), null);
+
+        return new ValidatedExtraction(
+            new ValidationResult(
+                "ReviewRequired",
+                "BehavioralEquivalenceNotProven",
+                true,
+                true,
+                originalErrors,
+                transformedErrors), transformedTree);
+    }
+
+    private static CSharpCompilation Compile(
+        SyntaxTree tree,
+        string name)
+    {
+        return CSharpCompilation.Create(
+            name,
+            new[] { tree },
+            GetRuntimeReferences(),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static int ErrorCount(
+        CSharpCompilation compilation)
+    {
+        return compilation.GetDiagnostics()
+            .Count(d =>
+                d.Severity == DiagnosticSeverity.Error);
+    }
+}
