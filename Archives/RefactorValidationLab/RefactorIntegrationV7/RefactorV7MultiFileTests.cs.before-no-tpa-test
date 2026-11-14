@@ -1,0 +1,140 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using EVI_Refactor;
+using Microsoft.CodeAnalysis;
+
+internal static class RefactorV7MultiFileTests
+{
+    public static void Run()
+    {
+        var references = ((string?)AppContext.GetData(
+            "TRUSTED_PLATFORM_ASSEMBLIES"))
+            ?.Split(Path.PathSeparator)
+            .Select(path => MetadataReference.CreateFromFile(path))
+            .ToArray()
+            ?? throw new InvalidOperationException(
+                "Runtime references unavailable.");
+
+        var lines = new List<string>
+        {
+            "class Consumer",
+            "{",
+            "    void Run()",
+            "    {"
+        };
+
+        for (int i = 0; i < 25; i++)
+        {
+            lines.Add(
+                $"        Helper.Process({i});");
+        }
+
+        lines.Add("    }");
+        lines.Add("}");
+
+        string consumer = string.Join("\n", lines);
+
+        const string helper = """
+            class Helper
+            {
+                public static void Process(int value)
+                {
+                    System.Console.WriteLine(value);
+                }
+            }
+            """;
+
+        var engine = new RefactorEngine();
+
+        string single = engine.AnalyzeSource(
+            "Consumer.cs",
+            consumer,
+            maxMethodLines: 5,
+            references: references);
+
+        string multi = engine.AnalyzeSources(
+            "TestProject",
+            new (string Name, string Content)[]
+            {
+                ("Consumer.cs", consumer),
+                ("Helper.cs", helper)
+            },
+            isDirectory: true,
+            maxMethodLines: 5,
+            references: references);
+
+        if (!single.Contains("REFACTOR CANDIDATES:") ||
+            !single.Contains("CompilationDiagnosticsPresent"))
+        {
+            throw new InvalidOperationException(
+                "Single-file baseline failed:\n" + single);
+        }
+
+        if (!multi.Contains("REFACTOR CANDIDATES:") ||
+            !multi.Contains("SemanticSafety: ReviewRequired") ||
+            !multi.Contains("BehavioralEquivalenceNotProven"))
+        {
+            throw new InvalidOperationException(
+                "Multifile V7 integration failed:\n" + multi);
+        }
+
+        if (multi.Contains("CompilationDiagnosticsPresent") ||
+            multi.Contains("CompilationTreeMismatch") ||
+            multi.Contains("SemanticAnalysisUnavailable"))
+        {
+            throw new InvalidOperationException(
+                "Unexpected multifile semantic failure:\n" + multi);
+        }
+
+        Console.WriteLine("Single-file unresolved dependency: PASS");
+        Console.WriteLine("Multifile dependency resolution: PASS");
+        Console.WriteLine("Multifile V7 integration: PASS");
+
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "EVI-Refactor-V7-" + Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "Consumer.cs"), consumer);
+            File.WriteAllText(Path.Combine(directory, "Helper.cs"), helper);
+
+            var originalOut = Console.Out;
+            using var captured = new StringWriter();
+            int exitCode;
+
+            try
+            {
+                Console.SetOut(captured);
+                exitCode = engine.Analyze(
+                    directory,
+                    maxMethodLines: 5);
+            }
+            finally
+            {
+                Console.SetOut(originalOut);
+            }
+
+            string report = captured.ToString();
+
+            if (exitCode != 0 ||
+                !report.Contains("C# files: 2") ||
+                !report.Contains("REFACTOR CANDIDATES:") ||
+                !report.Contains("SemanticSafety:"))
+            {
+                throw new InvalidOperationException(
+                    "Console directory routing failed:\n" + report);
+            }
+
+            Console.WriteLine("Console directory routing: PASS");
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+}

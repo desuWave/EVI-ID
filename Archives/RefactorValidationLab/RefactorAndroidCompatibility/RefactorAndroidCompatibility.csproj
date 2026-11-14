@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.CodeAnalysis">
+      <HintPath>/data/data/com.termux/files/usr/lib/dotnet/sdk/8.0.128/Roslyn/bincore/Microsoft.CodeAnalysis.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp">
+      <HintPath>/data/data/com.termux/files/usr/lib/dotnet/sdk/8.0.128/Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+    </Reference>
+
+    <Compile Include="../RefactorIntegrationV7/IntegrationProgram.cs" />
+    <Compile Include="../RefactorIntegrationV7/RefactorV7ResultAdapter.cs" />
+    <Compile Include="../RefactorIntegrationV7/RefactorV7ResultAdapterTests.cs" />
+    <Compile Include="../RefactorIntegrationV7/RefactorV7BridgeTests.cs" />
+    <Compile Include="../RefactorIntegrationV7/RefactorV7SharedCompilationTests.cs" />
+    <Compile Include="../RefactorIntegrationV7/RefactorV7MultiFileTests.cs" />
+
+    <Compile Include="../RefactorIntegrationV7/Working/RefactorEngine.cs" />
+    <Compile Include="../RefactorIntegrationV7/Working/RefactorSemanticBridge.cs" />
+
+    <Compile Include="../RefactorIntegrationV7/Working/SemanticExtractionValidator.cs" />
+    <Compile Include="../RefactorIntegrationV7/Validator/SemanticExtractionIntegration.cs" />
+    <Compile Include="../RefactorIntegrationV7/Validator/SymbolBindingPreservationValidator.cs" />
+    <Compile Include="../RefactorIntegrationV7/Validator/CallerInfoSafetyValidator.cs" />
+
+    <Compile Include="../../Projects/EVI-ID/mdl/RefactorSafetyAnalyzer.cs" />
+  </ItemGroup>
+</Project>

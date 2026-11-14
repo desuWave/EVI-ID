@@ -1,0 +1,59 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+internal static class SemanticExtractionIntegration
+{
+    public static ValidationResult Validate(
+        CSharpCompilation compilation,
+        MethodDeclarationSyntax method,
+        IReadOnlyList<StatementSyntax> statements)
+    {
+        ValidationResult Reject(string reason) =>
+            new("Unsupported", reason, false, false, null, null);
+
+        if (compilation is null ||
+            method is null ||
+            statements is null ||
+            statements.Count == 0)
+        {
+            return Reject("InvalidInput");
+        }
+
+        if (method.Body is null)
+            return Reject("MethodBodyUnavailable");
+
+        var tree = method.SyntaxTree;
+
+        if (tree is null ||
+            !compilation.SyntaxTrees.Contains(tree))
+        {
+            return Reject("CompilationTreeMismatch");
+        }
+
+        var body = method.Body.Statements;
+
+        int firstIndex = body.IndexOf(statements[0]);
+
+        if (firstIndex < 0 ||
+            statements.Count > body.Count - firstIndex)
+        {
+            return Reject("InvalidStatementRange");
+        }
+
+        for (int i = 0; i < statements.Count; i++)
+        {
+            if (!ReferenceEquals(
+                body[firstIndex + i],
+                statements[i]))
+            {
+                return Reject("NonContiguousStatements");
+            }
+        }
+
+        return Reject("IntegrationPending");
+    }
+}

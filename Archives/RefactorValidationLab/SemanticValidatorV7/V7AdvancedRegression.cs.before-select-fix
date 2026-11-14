@@ -1,0 +1,195 @@
+using System;
+using System.IO;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+internal static class V7AdvancedRegression
+{
+    private static readonly MetadataReference[] References =
+        ((string?)AppContext.GetData(
+            "TRUSTED_PLATFORM_ASSEMBLIES"))
+        ?.Split(Path.PathSeparator)
+        .Select(MetadataReference.CreateFromFile)
+        .ToArray()
+        ?? throw new InvalidOperationException(
+            "Runtime references unavailable.");
+
+    private static (
+        CSharpCompilation Compilation,
+        MethodDeclarationSyntax Method)
+        Create(string primary, string secondary)
+    {
+        var first = CSharpSyntaxTree.ParseText(
+            primary, path: "Primary.cs");
+
+        var second = CSharpSyntaxTree.ParseText(
+            secondary, path: "Secondary.cs");
+
+        var compilation = CSharpCompilation.Create(
+            "V7AdvancedRegression",
+            new[] { first, second },
+            References,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        var method = first.GetRoot()
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(m => m.Identifier.ValueText == "Test");
+
+        return (compilation, method);
+    }
+
+    private static bool Check(
+        string name,
+        string primary,
+        string secondary,
+        string expectedStatus,
+        string expectedReason,
+        bool expectedTransformed)
+    {
+        var (compilation, method) =
+            Create(primary, secondary);
+
+        var originalTrees =
+            compilation.SyntaxTrees.ToArray();
+
+        var originalErrors = compilation
+            .GetDiagnostics()
+            .Count(d =>
+                d.Severity == DiagnosticSeverity.Error);
+
+        var result =
+            SemanticExtractionIntegration.Validate(
+                compilation,
+                method,
+                method.Body!.Statements.ToArray());
+
+        var afterTrees =
+            compilation.SyntaxTrees.ToArray();
+
+        var afterErrors = compilation
+            .GetDiagnostics()
+            .Count(d =>
+                d.Severity == DiagnosticSeverity.Error);
+
+        bool unchanged =
+            originalTrees.Length == afterTrees.Length &&
+            originalTrees.Zip(afterTrees)
+                .All(pair =>
+                    ReferenceEquals(
+                        pair.First,
+                        pair.Second)) &&
+            originalErrors == afterErrors;
+
+        bool ok =
+            result.Status == expectedStatus &&
+            result.Reason == expectedReason &&
+            result.OriginalCompilationChecked &&
+            result.TransformedCompilationChecked ==
+                expectedTransformed &&
+            result.OriginalErrors == 0 &&
+            (!expectedTransformed ||
+                result.TransformedErrors == 0) &&
+            unchanged;
+
+        Console.WriteLine(
+            $"{name}: {(ok ? "PASS" : "FAIL")}");
+
+        Console.WriteLine(
+            $"  Status: {result.Status}");
+
+        Console.WriteLine(
+            $"  Reason: {result.Reason}");
+
+        Console.WriteLine(
+            $"  Original compilation unchanged: {unchanged}");
+
+        return ok;
+    }
+
+    public static bool Run()
+    {
+        int passed = 0;
+
+        if (Check(
+            "Multifile overload binding",
+            """
+            public class Probe
+            {
+                public void Test()
+                {
+                    External.Pick(123);
+                }
+            }
+            """,
+            """
+            public static class External
+            {
+                public static void Pick(int value) {}
+                public static void Pick(long value) {}
+            }
+            """,
+            "ReviewRequired",
+            "BehavioralEquivalenceNotProven",
+            true))
+            passed++;
+
+        if (Check(
+            "Multifile caller-info dependency",
+            """
+            public class Probe
+            {
+                public void Test()
+                {
+                    External.Log();
+                }
+            }
+            """,
+            """
+            using System.Runtime.CompilerServices;
+
+            public static class External
+            {
+                public static void Log(
+                    [CallerMemberName] string caller = "")
+                {
+                }
+            }
+            """,
+            "Unsupported",
+            "ImplicitCallerInfoDependency",
+            false))
+            passed++;
+
+        if (Check(
+            "Multifile compilation preservation",
+            """
+            public class Probe
+            {
+                public void Test()
+                {
+                    int value = 10;
+                    value++;
+                }
+            }
+            """,
+            """
+            public static class Unrelated
+            {
+                public static int Value => 42;
+            }
+            """,
+            "ReviewRequired",
+            "BehavioralEquivalenceNotProven",
+            true))
+            passed++;
+
+        Console.WriteLine(
+            $"V7 ADVANCED RESULT: {passed}/3 PASS");
+
+        return passed == 3;
+    }
+}

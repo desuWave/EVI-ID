@@ -1,0 +1,12 @@
+using System;
+
+Console.WriteLine(
+    "=== EVI-ID REFACTOR V7 INTEGRATION LAB ===");
+
+Console.WriteLine();
+Console.WriteLine("=== V7 RESULT ADAPTER TESTS ===");
+
+RefactorV7ResultAdapterTests.Run();
+
+Console.WriteLine();
+Console.WriteLine("Adapter regression tests completed.");
