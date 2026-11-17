@@ -1,3 +1,4 @@
+#if REFACTOR_CI
 using System;
 using System.Collections.Generic;
 
@@ -67,3 +68,5 @@ public static partial class UnitTestRunner
         return results.TrueForAll(x => x.Passed) ? 0 : 1;
     }
 }
+
+#endif

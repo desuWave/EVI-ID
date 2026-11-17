@@ -253,3 +253,11 @@ Consult the implementation and diagnostics when behavior differs between Interna
 - Refactor(F) preview does not apply source modifications.
 - A successful compilation is not proof of behavioral equivalence.
 - Built-in help text may not yet document every supported option.
+
+## Verified Android Test Result
+
+The latest reported installed Android development build completed `utst` with 87 reported test results, all passing.
+
+The separate RefactorCi regression runner completed 27 tests, all passing. It is executed through .NET rather than through the EVI-ID command shell.
+
+These are development verification results and do not imply that every possible command, source program, or Android storage provider is supported.

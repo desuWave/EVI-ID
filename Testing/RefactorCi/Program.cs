@@ -1,3 +1,4 @@
+#if REFACTOR_CI
 using System;
 using System.Collections.Generic;
 using EVI_ID.Testing;
@@ -28,3 +29,5 @@ Console.WriteLine(
     $"Tests: {results.Count}; Passed: {passed}; Failed: {failed}");
 
 return results.Count > 0 && failed == 0 ? 0 : 1;
+
+#endif

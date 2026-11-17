@@ -163,3 +163,13 @@ Its current validation is bounded by:
 - The compilation context used for analysis.
 
 Unknown or unsupported cases should remain visible to the user rather than being silently treated as safe.
+
+## Verified Regression Coverage
+
+The latest reported Android development run completed 87 passing test results, including Refactor(F) directive, semantic-validation, metadata-reference, and preview-formatting checks.
+
+The separate .NET 10 RefactorCi regression suite completed 27 passing tests, covering selected directive, semantic-bridge, diagnostic, and reference-forwarding scenarios.
+
+The standalone CI support sources use the `REFACTOR_CI` compilation symbol so that they do not conflict with the Android application's test infrastructure.
+
+Neither suite establishes behavioral equivalence for arbitrary source transformations. Validation remains limited to the implemented checks and exercised scenarios.

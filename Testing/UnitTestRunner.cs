@@ -448,6 +448,35 @@ public static partial class UnitTestRunner
             RunRefactorSafetyAnalyzerTests(results);
             RunRefactorSemanticBridgeTests(results);
             RunRefactorV7RegressionTests(results);
+            Run(
+                results,
+                "RefactorV7: SAF directive references",
+                () =>
+                {
+                    var directiveDirectory =
+                        SafReferenceDirectoryResolver.Resolve(androidContext);
+                    var directiveReferences =
+                        SafMetadataReferenceLoader.Load(
+                            androidContext,
+                            directiveDirectory.TreeUriString,
+                            directiveDirectory.DocumentId,
+                            new[] { "System.Runtime.dll" });
+
+                    var directiveResults =
+                        new List<UnitTestResult>();
+
+                    RunRefactorDirectiveRegressionTests(directiveResults, directiveReferences);
+                    RunRefactorDirectiveBoundaryTests(directiveResults, directiveReferences);
+                    RunRefactorDirectiveBridgeTests(directiveResults, directiveReferences);
+
+                    results.AddRange(directiveResults);
+
+                    if (directiveResults.Exists(result => !result.Passed))
+                    {
+                        throw new InvalidOperationException(
+                            "SAF directive regression tests failed.");
+                    }
+                });
             RunRefactorV7SemanticRuntimeTests(results, androidContext);
             RunRefactorV7PreviewFormattingTests(results, androidContext);
 

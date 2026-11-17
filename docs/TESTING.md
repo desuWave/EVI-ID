@@ -23,8 +23,8 @@ These commands are not equivalent to invoking dotnet test from an operating-syst
 
 The latest reported Android development test run completed with:
 
-    Total: 86
-    Passed: 86
+    Total: 87
+    Passed: 87
     Failed: 0
 
 This is a reported development result, not an independently reproduced result for every device or build configuration.
@@ -147,7 +147,7 @@ The locally verified regression suite reported:
 This CI suite is separate from the Android application's
 internal unit-test runner.
 
-The Android result of 86 passed tests and the CI result
+The Android result of 87 passed tests and the CI result
 of 27 passed tests must not be combined into a single
 test count.
 
@@ -155,3 +155,17 @@ CI success establishes that the selected regression
 scenarios passed in the tested environment. It does not
 establish full Android compatibility or behavioral
 equivalence for arbitrary transformations.
+
+## RefactorCi Conditional Compilation
+
+The standalone regression project defines `REFACTOR_CI` in `Testing/RefactorCi/RefactorCi.csproj`.
+
+The files `Program.cs`, `TestEntry.cs`, and `TestSupport.cs` in that directory are guarded by `#if REFACTOR_CI`.
+
+This prevents their test-runner definitions from conflicting with Android application sources when C# Shell processes files in the project directory.
+
+A verified local Release build completed with zero errors and warnings. Running `RefactorCi.dll` through the .NET host produced 27 passing tests.
+
+The subsequent Android APK export completed with zero errors and 72 warnings while all CI source files remained in place. The installed APK reported 87 passing tests.
+
+Some Android test groups are represented by aggregate result entries. The displayed test count should therefore be interpreted as the number of reported results, not necessarily the number of individual internal assertions.

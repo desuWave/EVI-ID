@@ -195,3 +195,13 @@ In particular:
 - Public documentation should be updated when observed behavior changes.
 
 These are development considerations, not claims that the corresponding extensions are already implemented.
+
+## RefactorCi Build Isolation
+
+The repository includes a separate .NET 10 regression project at `Testing/RefactorCi/RefactorCi.csproj`.
+
+Its support files (`Program.cs`, `TestEntry.cs`, and `TestSupport.cs`) are conditionally compiled under `REFACTOR_CI`. The dedicated project defines that symbol; the Android application does not require those CI-specific definitions.
+
+This arrangement was validated by building and running the standalone CI suite and exporting an Android APK with the CI source files remaining in their normal repository locations.
+
+The Android application's own unit-test runner remains separate from the standalone RefactorCi runner.

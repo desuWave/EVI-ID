@@ -14,7 +14,7 @@ It combines an interactive command shell, file-system operations, diagnostics, C
 | Framework | .NET 10 (`net10.0-android`) |
 | Language | C# |
 | Refactoring | Microsoft Roslyn |
-| Latest reported Android tests | 86 passed, 0 failed |
+| Latest reported Android tests | 87 passed, 0 failed |
 
 ## Features
 
@@ -133,8 +133,8 @@ Internal diagnostics include:
 
 The latest reported Android development test run completed with:
 
-    Tests: 86
-    Passed: 86
+    Tests: 87
+    Passed: 87
     Failed: 0
 
 This result applies to the tested development build and environment, not necessarily to every device or configuration.
@@ -147,3 +147,18 @@ This result applies to the tested development build and environment, not necessa
 - [Testing Guide](docs/TESTING.md)
 
 The documentation describes current experimental behavior and known limitations.
+
+## Verified Development Checks
+
+The latest reported development checks include:
+
+- Android APK export through C# Shell: successful, with 0 errors and 72 warnings.
+- Android internal unit-test runner: 87 passed, 0 failed.
+- Standalone RefactorCi .NET 10 regression runner: 27 passed, 0 failed.
+- RefactorCi Release build: 0 errors and 0 warnings.
+
+The Android and RefactorCi test suites are separate and must not be combined into a single test count.
+
+The RefactorCi support sources use conditional compilation with `REFACTOR_CI`. This allows the files to remain in the Android project directory without introducing duplicate test-runner definitions during APK compilation.
+
+These results describe the tested development environment, not general production readiness.

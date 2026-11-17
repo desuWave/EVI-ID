@@ -1,3 +1,4 @@
+#if REFACTOR_CI
 using System.Collections.Generic;
 
 namespace EVI_ID.Testing;
@@ -17,3 +18,5 @@ public static partial class UnitTestRunner
         RunLegacyCoverageTests(results);
     }
 }
+
+#endif

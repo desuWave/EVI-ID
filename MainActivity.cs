@@ -1385,7 +1385,7 @@ private void ShowCommandHelp(
             AppendConsole(
                 "type\n" +
                 "  Display the contents of a file.\n" +
-                "  Usage: type <file>\n");
+                "  Usage: type [--tail N] <file>\n");
             break;
 
         case "cat":
@@ -1398,8 +1398,8 @@ private void ShowCommandHelp(
         case "build":
             AppendConsole(
                 "build\n" +
-                "  Build a C# project or source file.\n" +
-                "  Usage: build <file>\n");
+                "  Build C# sources from a project directory.\n" +
+                "  Usage: build <project-directory>\n");
             break;
 
         case "git":
@@ -1413,8 +1413,11 @@ private void ShowCommandHelp(
         case "refactor":
             AppendConsole(
                 "refactor\n" +
-                "  Run the EVI-Refactor external module.\n" +
-                "  Usage: refactor <file>\n");
+                "  Analyze C# sources and preview refactoring candidates.\n" +
+                "  Usage: refactor <path> [--refs name.dll,name2.dll] [--discover]\n" +
+                "  Usage: refactor --candidates\n" +
+                "  Usage: refactor --preview <candidate-id>\n" +
+                "  Usage: refactor --clear\n");
             break;
 
         case "write":
@@ -1546,12 +1549,15 @@ private void ShowCommandHelp(
             "  space external\n" +
             "  ls\n" +
             "  cd <path>\n" +
-            "  type <file>\n" +
+            "  type [--tail N] <file>\n" +
             "  cat <file>\n" +
-            "  build <file>\n" +
+            "  build <project-directory>\n" +
             "  git version\n" +
             "  git clone <repository-url>\n" +
-            "  refactor <file>\n" +
+            "  refactor <path> [--refs name.dll,name2.dll] [--discover]\n" +
+            "  refactor --candidates\n" +
+            "  refactor --preview <candidate-id>\n" +
+            "  refactor --clear\n" +
             "  write <file> <text>\n" +
             "  append <file> <text>\n" +
             "  touch <file>\n" +
