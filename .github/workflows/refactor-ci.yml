@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/refactor-ci.yml'
       - 'mdl/**'
-      - 'Tools/RefactorRoslynSmoke/**'
+      - 'Testing/**'
   workflow_dispatch:
 
 permissions:
@@ -15,18 +15,26 @@ permissions:
   statuses: write
 
 jobs:
-  roslyn-smoke:
+  refactor-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
       - name: Restore
-        run: dotnet restore Tools/RefactorRoslynSmoke/RefactorRoslynSmoke.csproj
-      - name: Run Roslyn regression smoke tests
-        run: dotnet run --project Tools/RefactorRoslynSmoke/RefactorRoslynSmoke.csproj --no-restore --configuration Release
+        run: dotnet restore Testing/RefactorCi/RefactorCi.csproj
+
+      - name: Run Refactor regression tests
+        run: >
+          dotnet run
+          --project Testing/RefactorCi/RefactorCi.csproj
+          --configuration Release
+          --no-restore
 
       - name: Publish commit status
         if: ${{ always() }}
@@ -34,7 +42,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            const state = '${{ job.status }}' === 'success'
+              ? 'success'
+              : 'failure';
+
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -42,7 +53,7 @@ jobs:
               state,
               context: 'EVI-ID / Refactor Roslyn CI',
               description: state === 'success'
-                ? 'Roslyn smoke tests passed'
-                : 'Roslyn smoke tests failed or did not complete',
+                ? 'Refactor regression tests passed'
+                : 'Refactor regression tests failed or did not complete',
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });

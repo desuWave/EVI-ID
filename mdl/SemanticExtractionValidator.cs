@@ -144,6 +144,11 @@ internal static class SemanticExtractionValidator
             return RejectAfterOriginal(
                 "OriginalCompilationErrors");
 
+        // Conservative guard for conditional compilation.
+        if (body.ContainsDirectives)
+            return RejectAfterOriginal(
+                "PreprocessorDirectivesPresent");
+
         var model = originalCompilation.GetSemanticModel(tree);
 
         var control = model.AnalyzeControlFlow(
