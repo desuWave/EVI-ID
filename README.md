@@ -1,135 +1,149 @@
 # EVI-ID
 
-EVI-ID is an experimental Android application focused on command execution, file management, software development tools, and diagnostics.
+**EVI-ID** is an experimental Android development environment built with C# and .NET 10.
 
-- **Version:** `0.1.0`
-- **Development stage:** Pre-Alpha
-- **Platform:** Android
-- **Target framework:** .NET 10 (`net10.0-android`)
+It combines an interactive command shell, file-system operations, diagnostics, C# compilation, and Roslyn-based source analysis and refactoring.
 
-## Overview
+## Project Information
 
-EVI-ID is an evolving Android-based development environment combining a command interface with project management, file-system operations, diagnostics, and experimental development modules.
-
-The project is under active development. Features, interfaces, and internal architecture may change.
-
-## Current Implementation
-
-### Console and Commands
-
-- Interactive command interface.
-- Built-in file and directory operations.
-- Command output and error reporting.
-- Command help system.
-- Internal working-directory navigation.
-
-### File System and Projects
-
-- Internal project directory management.
-- External folder access through Android's Storage Access Framework (SAF).
-- File creation, reading, writing, renaming, and deletion.
-- Internal and external directory navigation.
-
-### Diagnostics and Logging
-
-- Dedicated diagnostics activity.
-- Application logging.
-- Log viewing and copying.
-- Startup diagnostics.
-- Operation tracking.
-
-### Experimental Development Modules
-
-The source tree includes modules for:
-
-- C# compilation and build operations.
-- Editor buffers and editing sessions.
-- Runtime type loading and method invocation.
-- Git integration.
-- Source-code structure and refactoring analysis.
-- Build-output navigation.
-- Internal unit testing.
-
-These components are under development and should not be considered production-ready.
-
-## Project Structure
-
-| Path | Purpose |
+| Property | Value |
 |---|---|
-| `MainActivity.cs` | Main Android application interface and command handling |
-| `DiagnosticsActivity.cs` | Diagnostics interface |
-| `Shell/` | Command execution, file systems, storage, logging and shell services |
-| `mdl/Build/` | Build functionality |
-| `mdl/Editor/` | Experimental editor and compilation functionality |
-| `mdl/Git/` | Git-related functionality |
-| `mdl/RefactorEngine.cs` | Source-code analysis |
-| `Testing/` | Internal testing utilities |
+| Version | 0.1.0 |
+| Stage | Pre-Alpha |
+| Platform | Android |
+| Framework | .NET 10 (`net10.0-android`) |
+| Language | C# |
+| Refactoring | Microsoft Roslyn |
+| Latest reported Android tests | 86 passed, 0 failed |
 
-## Build Requirements
+## Features
 
-EVI-ID targets .NET 10 for Android.
+### Interactive Shell
 
-Building requires a compatible .NET SDK, Android development tooling, and the appropriate Android workload or supported build environment.
+- Built-in commands and command help.
+- Internal file and directory operations.
+- External storage access through Android SAF.
+- Console output navigation.
+- Command execution and diagnostics.
 
-Some development configurations may require locally supplied reference assemblies and SDK paths.
+### Development Tools
+
+- Experimental Roslyn C# compilation.
+- Source-file analysis.
+- Refactor(F) candidate discovery.
+- Read-only refactoring previews.
+- Metadata-reference loading through SAF.
+- Experimental GitHub archive downloading.
+- Internal regression tests.
 
 ## Development Status
 
-**Pre-Alpha — active development.**
+EVI-ID is under active development.
 
-The current implementation is experimental. Not all features have been fully tested, and some functionality may be incomplete or platform-dependent.
+The current implementation is experimental and is not production-ready. Interfaces, functionality, and compatibility may change.
 
-## Future Development
+No stable release has been declared.
 
-Development may include improvements to the editor, build tools, project management, Git integration, diagnostics, and the overall interactive development experience.
+## Getting Started
 
-No stable release is currently declared.
+Launch EVI-ID on Android and open its command interface.
 
-## Android Refactor(F) — Experimental
+Basic commands:
 
-EVI-ID includes an experimental C# source-code refactoring workflow
-powered by Roslyn and integrated into the Android command interface.
+    help
+    pwd
+    space
+    ls
 
-### Current Capabilities
+Switch between storage spaces:
 
-- C# source analysis with explicitly supplied metadata references.
-- Refactoring candidate discovery for supported statement groups.
-- Session-based candidate identifiers.
-- Read-only preview of proposed method extraction.
-- Original and transformed compilation validation.
-- Semantic and safety checks for supported extraction scenarios.
-- Preview formatting for generated helper methods.
-- Android Storage Access Framework (SAF) integration.
+    space internal
+    space external
 
-### Verified Android Tests
+External storage requires an existing Android SAF connection.
 
-The current development build completed 76 of 76 internal unit
-tests successfully, including Android semantic validation and
-preview-formatting regression coverage.
+## Refactor(F)
 
-A separate Android verification using
-`SemanticProbeIndependent.cs` discovered 11 extraction candidates.
+Refactor(F) provides experimental C# source analysis, candidate discovery, and read-only transformation previews.
 
-Preview of candidate 10 completed with:
+Example workflow:
 
-- Original compilation errors: 0.
-- Transformed compilation errors: 0.
-- Status: `ReviewRequired`.
-- Reason: `BehavioralEquivalenceNotProven`.
-- No source files modified.
+    refactor Example.cs --discover
+    refactor --candidates
+    refactor --preview <candidate-id>
+    refactor --clear
+
+Replace <candidate-id> with an identifier returned by discovery.
+
+Optional metadata references:
+
+    refactor Example.cs --refs System.Runtime.dll --discover
+
+The --refs option accepts comma-separated DLL filenames. Reference assemblies must be accessible through the configured SAF reference directory.
 
 ### Safety and Limitations
 
-Refactor(F) is experimental and is not production-ready.
+- Discovery does not modify source files.
+- Preview does not apply transformations.
+- Source files are re-read during preview.
+- Preview may report unsupported or review-required cases.
+- Compilation success alone does not prove behavioral equivalence.
+- Changing the active file space requires a new discovery session.
 
-Successful compilation does not establish behavioral equivalence.
-The current preview workflow does not automatically apply
-transformations when behavioral equivalence remains unproven.
+Refactor(F) remains experimental. All proposed transformations require independent review.
 
-Candidate identifiers are session-specific and must be obtained
-from the current discovery session.
 
-Preservation of comments, custom formatting, and additional
-language constructs requires further regression testing.
+## C# Build Module
 
-The implementation and its safety checks are under active development.
+EVI-ID provides experimental Roslyn-based C# compilation.
+
+Command:
+
+    build <project-directory>
+
+The module recursively scans C# source files, creates a Roslyn compilation, reports diagnostics, and writes a DLL under:
+
+    <project-directory>/bin/evi-build/
+
+Directories named Tools and translation-output are excluded from source discovery.
+
+This is not equivalent to dotnet build. General MSBuild project evaluation, NuGet restore, and Android APK generation are not implemented by this module.
+
+## GitHub Integration
+
+Available commands:
+
+    git version
+    git clone <repository-url>
+
+The current Git module downloads and extracts the main branch ZIP archive from GitHub.
+
+Despite the command name, this is not a full Git clone. The operation does not create Git metadata or preserve commit history.
+
+Git operations such as commit, pull, and push are not implemented by the module.
+
+## Testing and Diagnostics
+
+Internal diagnostics include:
+
+    refdiag
+    saf-test
+    editor jit-test
+    utst
+
+The latest reported Android development test run completed with:
+
+    Tests: 86
+    Passed: 86
+    Failed: 0
+
+This result applies to the tested development build and environment, not necessarily to every device or configuration.
+
+## Documentation
+
+- [Command Reference](docs/COMMANDS.md)
+- [Refactor(F) Guide](docs/REFACTOR.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Testing Guide](docs/TESTING.md)
+
+The documentation describes current experimental behavior and known limitations.
